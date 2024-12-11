@@ -76,19 +76,19 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
 
     TString ProductionYear = "20" + ProductionName(3, 2);
 
-    TString DataPath = Form("%s/%s", InputPath.Data(), ProductionName.Data());
-    if (IsSignalMC) DataPath += Form("/%s", SimulationSet.Data());
+    TString DataPath = TString::Format("%s/%s", InputPath.Data(), ProductionName.Data());
+    if (IsSignalMC) DataPath += TString::Format("/%s", SimulationSet.Data());
 
-    TString GridDataDir = Form("/alice/data/%s/%s", ProductionYear.Data(), ProductionName.Data());
-    if (IsMC) GridDataDir = Form("/alice/sim/%s/%s", ProductionYear.Data(), ProductionName.Data());
-    if (IsSignalMC) GridDataDir += Form("/%s", SimulationSet.Data());
+    TString GridDataDir = TString::Format("/alice/data/%s/%s", ProductionYear.Data(), ProductionName.Data());
+    if (IsMC) GridDataDir = TString::Format("/alice/sim/%s/%s", ProductionYear.Data(), ProductionName.Data());
+    if (IsSignalMC) GridDataDir += TString::Format("/%s", SimulationSet.Data());
 
-    TString GridDataPattern = Form("/pass%i/*/AliESDs.root", PassNumber);
+    TString GridDataPattern = TString::Format("/pass%i/*/AliESDs.root", PassNumber);
     if (IsMC) GridDataPattern = "/*/AliESDs.root";
 
-    TString GridWorkingDir = Form("work/Sexaquark_Data_%s", ProductionName.Data());
-    if (IsMC) GridWorkingDir = Form("work/Sexaquark_MC_%s", ProductionName.Data());
-    if (IsSignalMC) GridWorkingDir += Form("_%s", SimulationSet.Data());
+    TString GridWorkingDir = TString::Format("work/Esd2Tree_Data_%s", ProductionName.Data());
+    if (IsMC) GridWorkingDir = TString::Format("work/Esd2Tree_MC_%s", ProductionName.Data());
+    if (IsSignalMC) GridWorkingDir += TString::Format("_%s", SimulationSet.Data());
 
     TString GridOutputDir = "output";
 
@@ -106,13 +106,11 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
 
     /* Start */
 
-    gInterpreter->ProcessLine(".include .");
+    // gInterpreter->ProcessLine(".include .");
     gInterpreter->ProcessLine(".include $ROOTSYS/include");
     gInterpreter->ProcessLine(".include $ALICE_ROOT/include");
-    gInterpreter->ProcessLine(".include $ALICE_PHYSICS/include");
-    gInterpreter->ProcessLine(".include $KFPARTICLE_ROOT/include");
 
-    AliAnalysisManager *mgr = new AliAnalysisManager("AnalysisManager_Sexaquark");
+    AliAnalysisManager *mgr = new AliAnalysisManager("AnalysisManager_Esd2Tree");
 
     std::cout << "!! runAnalysis.C !! Created AliAnalysisManager !!" << std::endl;
 
@@ -123,8 +121,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     if (Mode == "grid") {
         alienHandler = new AliAnalysisAlien();
         alienHandler->SetCheckCopy(kFALSE);
-        alienHandler->AddIncludePath(
-            "-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include -I$KFPARTICLE_ROOT/include");
+        alienHandler->AddIncludePath("-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include");
         alienHandler->SetAdditionalLibs("AliAnalysisTaskEsd2Tree.cxx AliAnalysisTaskEsd2Tree.h");
         alienHandler->SetAnalysisSource("AliAnalysisTaskEsd2Tree.cxx");
         alienHandler->SetAliPhysicsVersion("vAN-20241126_O2-1");
@@ -142,8 +139,8 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         // alienHandler->SetMaxMergeStages(1);
         alienHandler->SetGridWorkingDir(GridWorkingDir);
         alienHandler->SetGridOutputDir(GridOutputDir);
-        alienHandler->SetJDLName("TaskSexaquark.jdl");
-        alienHandler->SetExecutable("TaskSexaquark.sh");
+        alienHandler->SetJDLName("TaskEsd2Tree.jdl");
+        alienHandler->SetExecutable("TaskEsd2Tree.sh");
 
         mgr->SetGridHandler(alienHandler);
 
@@ -177,7 +174,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     /* Add Helper Tasks */
 
     Bool_t applyPileupCuts = kFALSE;  // kFALSE in Pb-Pb (as recommended in: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel)
-    TString TaskPhysicsSelection_Options = Form("(%i, %i)", (Int_t)IsMC, (Int_t)applyPileupCuts);
+    TString TaskPhysicsSelection_Options = TString::Format("(%i, %i)", (Int_t)IsMC, (Int_t)applyPileupCuts);
     AliPhysicsSelectionTask *TaskPhysicsSelection = reinterpret_cast<AliPhysicsSelectionTask *>(
         gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options));
     if (!TaskPhysicsSelection) return;
@@ -187,21 +184,21 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options));
     if (!TaskCentrality) return;
 
-    TString TaskPIDResponse_Options = Form("(%i, 1, 1, \"%i\")", (Int_t)IsMC, PassNumber);
+    TString TaskPIDResponse_Options = TString::Format("(%i, 1, 1, \"%i\")", (Int_t)IsMC, PassNumber);
     AliAnalysisTaskPIDResponse *TaskPIDResponse = reinterpret_cast<AliAnalysisTaskPIDResponse *>(
         gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
     if (!TaskPIDResponse) return;
 
     std::cout << "!! runAnalysis.C !! Passed addition of helper tasks !!" << std::endl;
 
-    /* Add Sexaquark Task */
+    /* Add Esd2Tree Task */
 
     gInterpreter->LoadMacro("AliAnalysisTaskEsd2Tree.cxx++g");
 
-    TString TaskSexaquark_Options = Form("(%i, %i)", (Int_t)IsMC, (Int_t)IsSignalMC);
-    AliAnalysisTaskEsd2Tree *TaskSexaquark =
-        reinterpret_cast<AliAnalysisTaskEsd2Tree *>(gInterpreter->ExecuteMacro("AddTask.C" + TaskSexaquark_Options));
-    if (!TaskSexaquark) return;
+    TString TaskEsd2Tree_Options = TString::Format("(%i, %i)", (Int_t)IsMC, (Int_t)IsSignalMC);
+    AliAnalysisTaskEsd2Tree *TaskEsd2Tree =
+        reinterpret_cast<AliAnalysisTaskEsd2Tree *>(gInterpreter->ExecuteMacro("AddTask_Esd2Tree.C" + TaskEsd2Tree_Options));
+    if (!TaskEsd2Tree) return;
 
     std::cout << "!! runAnalysis.C !! Passed addition of main task !!" << std::endl;
 
@@ -234,14 +231,15 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         for (Int_t &RN : RunNumbersFromList) {
             if (IsMC) {
                 for (Int_t DN = 1; DN <= LocalNDirs; DN++) {
-                    FilePath = Form("%s%s/%i/%03i/AliESDs.root", Prefix.Data(), DataPath.Data(), RN, DN);
+                    FilePath = TString::Format("%s%s/%i/%03i/AliESDs.root", Prefix.Data(), DataPath.Data(), RN, DN);
                     chain->AddFile(FilePath);
                 }
             } else {  // !IsMC (data)
                 for (Int_t DN = 1; DN <= 99; DN++) {
                     for (Int_t sDN = 100; sDN <= 5000; sDN++) {
-                        DirString = Form("%s000%i%03i.%i", TString(ProductionName(3, 2)).Data(), RN, DN, sDN);
-                        FilePath = Form("%s%s/000%i/pass%i/%s/AliESDs.root", Prefix.Data(), DataPath.Data(), RN, PassNumber, DirString.Data());
+                        DirString = TString::Format("%s000%i%03i.%i", TString(ProductionName(3, 2)).Data(), RN, DN, sDN);
+                        FilePath =
+                            TString::Format("%s%s/000%i/pass%i/%s/AliESDs.root", Prefix.Data(), DataPath.Data(), RN, PassNumber, DirString.Data());
                         if (gSystem->AccessPathName(FilePath)) continue;
                         chain->AddFile(FilePath);
                     }
