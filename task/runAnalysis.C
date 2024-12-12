@@ -106,9 +106,9 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
 
     /* Start */
 
-    // gInterpreter->ProcessLine(".include .");
     gInterpreter->ProcessLine(".include $ROOTSYS/include");
     gInterpreter->ProcessLine(".include $ALICE_ROOT/include");
+    gInterpreter->ProcessLine(".include $ALICE_PHYSICS/include");
 
     AliAnalysisManager *mgr = new AliAnalysisManager("AnalysisManager_Esd2Tree");
 

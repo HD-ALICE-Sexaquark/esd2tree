@@ -58,6 +58,8 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
    public:
     AliAnalysisTaskEsd2Tree();
     AliAnalysisTaskEsd2Tree(const char* name);
+    AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);
+    AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
     virtual ~AliAnalysisTaskEsd2Tree();
     virtual void Terminate(Option_t* option) { return; }
 
@@ -199,12 +201,15 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tTrack_Px;                  //! inner parametrization
     Float_t tTrack_Py;                  //! inner parametrization
     Float_t tTrack_Pz;                  //! inner parametrization
+    Float_t tTrack_Xv;                  //!
+    Float_t tTrack_Yv;                  //!
+    Float_t tTrack_Zv;                  //!
     Short_t tTrack_Charge;              //!
     Float_t tTrack_Alpha;               //!
     Float_t tTrack_SineAzimuthalAngle;  //!
     Float_t tTrack_TangentDipAngle;     //!
     Float_t tTrack_OneOverPt;           //!
-    // Float_t tTrack_CovMatrix[15];       //! covariance matrix
+    Float_t tTrack_CovMatrix[15];       //! covariance matrix
     Float_t tTrack_NSigmaPion;          //!
     Float_t tTrack_NSigmaKaon;          //!
     Float_t tTrack_NSigmaProton;        //!
@@ -235,15 +240,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t kMin_Track_DCAxy_wrtPV;          //
     Float_t kMin_Track_DCAz_wrtPV;           //
 
-    TList* fList_Dummy;  //!
-    TH1F* fHist_Dummy;   //!
-
-    AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);             // not implemented
-    AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);  // not implemented
-
-    /// \cond CLASSDEF
-    ClassDef(AliAnalysisTaskEsd2Tree, 1);  // = number of persistent members
-    /// \endcond
+    ClassDef(AliAnalysisTaskEsd2Tree, 13);  // = number of persistent members
 };
 
-#endif
+#endif  // ALIANALYSISTASKESD2TREE_H
