@@ -206,8 +206,8 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tTrack_Zv;                  //!
     Short_t tTrack_Charge;              //!
     Float_t tTrack_Alpha;               //!
-    Float_t tTrack_SineAzimuthalAngle;  //!
-    Float_t tTrack_TangentDipAngle;     //!
+    Float_t tTrack_SinAzimAngle;        //!
+    Float_t tTrack_TanDipAngle;         //!
     Float_t tTrack_OneOverPt;           //!
     Float_t tTrack_CovMatrix[15];       //! covariance matrix
     Float_t tTrack_NSigmaPion;          //!
