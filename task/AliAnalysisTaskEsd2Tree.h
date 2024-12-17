@@ -1,26 +1,13 @@
 #ifndef ALIANALYSISTASKESD2TREE_H
 #define ALIANALYSISTASKESD2TREE_H
 
-#ifndef ALIANALYSISTASKSE_H
-#include "AliAnalysisTaskSE.h"
-#endif
-
-#include <algorithm>
-#include <array>
 #include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <tuple>
-#include <unordered_set>
-#include <vector>
 
 #include "TArray.h"
 #include "TChain.h"
+#include "TClass.h"
 #include "TFile.h"
 #include "TGrid.h"
-#include "TH1.h"
-#include "TList.h"
 #include "TObjArray.h"
 #include "TObjString.h"
 #include "TROOT.h"
@@ -28,12 +15,15 @@
 #include "TSystem.h"
 #include "TTree.h"
 
+#ifndef ALIANALYSISTASKSE_H
+#include "AliAnalysisTaskSE.h"
+#endif
+
 #include "AliAnalysisManager.h"
 #include "AliExternalTrackParam.h"
 #include "AliHelix.h"
 #include "AliInputEventHandler.h"
 #include "AliLog.h"
-#include "AliPIDResponse.h"
 #include "AliVEvent.h"
 #include "AliVVertex.h"
 
@@ -51,6 +41,7 @@
 #include "AliAnalysisUtils.h"
 #include "AliEventCuts.h"
 #include "AliMultSelection.h"
+#include "AliPIDResponse.h"
 
 class AliPIDResponse;
 
@@ -58,10 +49,10 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
    public:
     AliAnalysisTaskEsd2Tree();
     AliAnalysisTaskEsd2Tree(const char* name);
+    virtual ~AliAnalysisTaskEsd2Tree();
+
     AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);
     AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
-    virtual ~AliAnalysisTaskEsd2Tree();
-    virtual void Terminate(Option_t* option) { return; }
 
     /* Settings ~ stored in Analysis Manager */
     void IsMC(Bool_t IsMC, Bool_t IsSignalMC = kFALSE) {
@@ -75,7 +66,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     virtual void UserCreateOutputObjects();
     virtual Bool_t UserNotify();
     virtual void UserExec(Option_t* option);
-    void EndOfEvent();
+    virtual void Terminate(Option_t* option) { return; }
 
     /* Trees */
     void PrepareEventsBranches();
@@ -95,7 +86,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     void ProcessMCGen();
     Int_t GetAncestor(Int_t mcIdx, Int_t generation = 0);
     Short_t GetGenerator(Int_t mcIdx);
-    Int_t GetReactionID(Int_t ancestorIdx);
+    Int_t GetReactionID(Int_t mcIdx, Int_t ancestorIdx);
 
     /* Tracks */
     void ProcessTracks();
@@ -118,9 +109,9 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliEventCuts fEventCuts;        //! event cuts
     Double_t fMagneticField;        //! magnetic field
 
-    Int_t fRunNumber;     //! run number
+    UInt_t fRunNumber;    //! run number
     Float_t fDirNumber;   //! directory number
-    Int_t fEventNumber;   //! event number
+    UInt_t fEventNumber;  //! event number
     Float_t fCentrality;  //! centrality percentile
 
     /* External Files */
@@ -152,7 +143,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tEvents_PV_Zv_FromSPD;        //!
     Float_t tEvents_PV_Zv_FromTracks;     //!
     Float_t tEvents_PV_Dispersion;        //!
-    Int_t tEvents_NTracks;                //!
+    UInt_t tEvents_NTracks;               //!
     Int_t tEvents_NTPCClusters;           //!
     Bool_t tEvents_IsMB;                  //!
     Bool_t tEvents_IsHighMultV0;          //!
@@ -161,10 +152,10 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tEvents_IsSemiCentral;         //!
 
     /** Injected Sexaquarks **/
-    Int_t tInjected_RunNumber;         //!
-    Int_t tInjected_DirNumber;         //!
-    Int_t tInjected_EventNumber;       //!
-    Int_t tInjected_ReactionID;        //!
+    UInt_t tInjected_RunNumber;        //!
+    UInt_t tInjected_DirNumber;        //!
+    UInt_t tInjected_EventNumber;      //!
+    UInt_t tInjected_ReactionID;       //!
     Float_t tInjected_Px;              //!
     Float_t tInjected_Py;              //!
     Float_t tInjected_Pz;              //!
@@ -176,8 +167,11 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     UInt_t tInjected_ReactionChannel;  //! char -> ASCII -> uint
 
     /** MC Particles **/
-    Int_t tMC_Idx;           //!
-    Int_t tMC_PdgCode;       //!
+    UInt_t tMC_RunNumber;    //! run number
+    Float_t tMC_DirNumber;   //! directory number
+    UInt_t tMC_EventNumber;  //! event number
+    UInt_t tMC_Idx;          //!
+    Long_t tMC_PdgCode;      //!
     Int_t tMC_Idx_Mother;    //!
     Int_t tMC_NDaughters;    //!
     Int_t tMC_Idx_FirstDau;  //!
@@ -197,18 +191,21 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Int_t tMC_ReactionID;    //!
 
     /** Tracks **/
-    Int_t tTrack_Idx;                   //!
+    UInt_t tTrack_RunNumber;            //! run number
+    Float_t tTrack_DirNumber;           //! directory number
+    UInt_t tTrack_EventNumber;          //! event number
+    UInt_t tTrack_Idx;                  //!
     Float_t tTrack_Px;                  //! inner parametrization
     Float_t tTrack_Py;                  //! inner parametrization
     Float_t tTrack_Pz;                  //! inner parametrization
-    Float_t tTrack_Xv;                  //!
-    Float_t tTrack_Yv;                  //!
-    Float_t tTrack_Zv;                  //!
+    Float_t tTrack_X;                   //!
+    Float_t tTrack_Y;                   //!
+    Float_t tTrack_Z;                   //!
     Short_t tTrack_Charge;              //!
     Float_t tTrack_Alpha;               //!
-    Float_t tTrack_SinAzimAngle;        //!
-    Float_t tTrack_TanDipAngle;         //!
-    Float_t tTrack_OneOverPt;           //!
+    Float_t tTrack_Snp;                 //! local sine of the track momentum azimuthal angle
+    Float_t tTrack_Tgl;                 //! tangent of the track momentum dip angle
+    Float_t tTrack_Signed1Pt;           //! 1/pt
     Float_t tTrack_CovMatrix[15];       //! covariance matrix
     Float_t tTrack_NSigmaPion;          //!
     Float_t tTrack_NSigmaKaon;          //!
