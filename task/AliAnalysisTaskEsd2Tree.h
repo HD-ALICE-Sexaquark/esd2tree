@@ -8,6 +8,7 @@
 #include "TClass.h"
 #include "TFile.h"
 #include "TGrid.h"
+#include "TH1.h"
 #include "TObjArray.h"
 #include "TObjString.h"
 #include "TROOT.h"
@@ -66,30 +67,28 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     virtual void UserCreateOutputObjects();
     virtual Bool_t UserNotify();
     virtual void UserExec(Option_t* option);
+    virtual void FinishTaskOutput();
     virtual void Terminate(Option_t* option) { return; }
 
     /* Trees */
-    void PrepareEventsBranches();
-    void PrepareInjectedBranches();
-    void PrepareMCParticlesBranches();
-    void PrepareTracksBranches();
-
-    void ClearEventsBranches();
-    void ClearInjectedBranches();
-    void ClearMCParticlesBranches();
-    void ClearTracksBranches();
+    void AssociateEventsBranches();
+    void AssociateInjectedBranches();
+    void AssociateMCParticlesBranches();
+    void AssociateTracksBranches();
+    void WriteTree(TTree* thisTree);
 
     /* Events */
     Bool_t PassesEventSelection();
+    void FillEvent();
 
     /* MC Generated */
-    void ProcessMCGen();
+    void FillMCParticles();
     Int_t GetAncestor(Int_t mcIdx, Int_t generation = 0);
     Short_t GetGenerator(Int_t mcIdx);
     Int_t GetReactionID(Int_t mcIdx, Int_t ancestorIdx);
 
     /* Tracks */
-    void ProcessTracks();
+    void FillTracks();
     Bool_t PassesTrackSelection(AliESDtrack* track);
 
     /* External Files */
@@ -97,10 +96,12 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
    private:
     /* Settings ~ stored in Analysis Manager ~ all persistent */
+
     Bool_t fIsMC;        // kTRUE if MC simulation, kFALSE if data
     Bool_t fIsSignalMC;  // kTRUE to read and load signal logs
 
     /* AliRoot Objects */
+
     AliMCEvent* fMC;                //! MC event
     AliVVertex* fMC_PrimaryVertex;  //! MC gen. (or true) primary vertex
     AliESDEvent* fESD;              //! reconstructed event
@@ -109,49 +110,60 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliEventCuts fEventCuts;        //! event cuts
     Double_t fMagneticField;        //! magnetic field
 
-    UInt_t fRunNumber;    //! run number
-    Float_t fDirNumber;   //! directory number
-    UInt_t fEventNumber;  //! event number
-    Float_t fCentrality;  //! centrality percentile
+    TString fSignalSimSet;  //! signal simulations set (e.g. "A1.8", "H2.01")
+    UInt_t fRunNumber;      //! run number
+    Float_t fDirNumber;     //! directory number
+    UInt_t fEventNumber;    //! event number
+    Float_t fCentrality;    //! centrality percentile
 
     /* External Files */
+
     TString fAliEnPath;        //! loaded in `UserNotify()`
     Bool_t fIsFirstEvent;      //!
     TString fReactionChannel;  //! derived from `fAliEnPath` in `UserNotify()`
 
-    /*** Trees ***/
+    /* Output */
 
-    TTree* fTree_Events;    //!
+    /** QA Histograms **/
+
+    TList* fOutputList;          //!
+    TH1F* fHist_Centrality;      //!
+    TH1F* fHist_CentralityINT7;  //!
+
+    /** File and subdir **/
+
+    TFile* fOutputFile;      //! pointer to the output file
+    TDirectory* fOutputDir;  //! pointer to the output subdirectory
+
+    /** Trees **/
+
+    TTree* fTree_Event;     //!
     TTree* fTree_Injected;  //!
     TTree* fTree_MC;        //!
     TTree* fTree_Tracks;    //!
 
-    /*** Branches ***/
+    Float_t tEvent_PV_TrueXv;            //!
+    Float_t tEvent_PV_TrueYv;            //!
+    Float_t tEvent_PV_TrueZv;            //!
+    Bool_t tEvent_IsGenPileup;           //!
+    Bool_t tEvent_IsSBCPileup;           //!
+    Float_t tEvent_PV_RecXv;             //!
+    Float_t tEvent_PV_RecYv;             //!
+    Float_t tEvent_PV_RecZv;             //!
+    Int_t tEvent_PV_NContributors;       //!
+    Float_t tEvent_PV_ZvErr_FromSPD;     //!
+    Float_t tEvent_PV_ZvErr_FromTracks;  //!
+    Float_t tEvent_PV_Zv_FromSPD;        //!
+    Float_t tEvent_PV_Zv_FromTracks;     //!
+    Float_t tEvent_PV_Dispersion;        //!
+    UInt_t tEvent_NTracks;               //!
+    Int_t tEvent_NTPCClusters;           //!
+    Bool_t tEvent_IsMB;                  //!
+    Bool_t tEvent_IsHighMultV0;          //!
+    Bool_t tEvent_IsHighMultSPD;         //!
+    Bool_t tEvent_IsCentral;             //!
+    Bool_t tEvent_IsSemiCentral;         //!
 
-    /** Events **/
-    Float_t tEvents_PV_TrueXv;            //!
-    Float_t tEvents_PV_TrueYv;            //!
-    Float_t tEvents_PV_TrueZv;            //!
-    Bool_t tEvents_IsGenPileup;           //!
-    Bool_t tEvents_IsSBCPileup;           //!
-    Float_t tEvents_PV_RecXv;             //!
-    Float_t tEvents_PV_RecYv;             //!
-    Float_t tEvents_PV_RecZv;             //!
-    Int_t tEvents_PV_NContributors;       //!
-    Float_t tEvents_PV_ZvErr_FromSPD;     //!
-    Float_t tEvents_PV_ZvErr_FromTracks;  //!
-    Float_t tEvents_PV_Zv_FromSPD;        //!
-    Float_t tEvents_PV_Zv_FromTracks;     //!
-    Float_t tEvents_PV_Dispersion;        //!
-    UInt_t tEvents_NTracks;               //!
-    Int_t tEvents_NTPCClusters;           //!
-    Bool_t tEvents_IsMB;                  //!
-    Bool_t tEvents_IsHighMultV0;          //!
-    Bool_t tEvents_IsHighMultSPD;         //!
-    Bool_t tEvents_IsCentral;             //!
-    Bool_t tEvents_IsSemiCentral;         //!
-
-    /** Injected Sexaquarks **/
     UInt_t tInjected_RunNumber;        //!
     UInt_t tInjected_DirNumber;        //!
     UInt_t tInjected_EventNumber;      //!
@@ -166,7 +178,6 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tInjected_Nucleon_Pz;      //!
     UInt_t tInjected_ReactionChannel;  //! char -> ASCII -> uint
 
-    /** MC Particles **/
     UInt_t tMC_RunNumber;    //! run number
     Float_t tMC_DirNumber;   //! directory number
     UInt_t tMC_EventNumber;  //! event number
@@ -190,7 +201,6 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tMC_IsSignal;     //!
     Int_t tMC_ReactionID;    //!
 
-    /** Tracks **/
     UInt_t tTrack_RunNumber;            //! run number
     Float_t tTrack_DirNumber;           //! directory number
     UInt_t tTrack_EventNumber;          //! event number
