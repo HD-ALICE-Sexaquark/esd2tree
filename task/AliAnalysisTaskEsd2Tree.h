@@ -2,6 +2,7 @@
 #define ALIANALYSISTASKESD2TREE_H
 
 #include <fstream>
+#include <map>
 
 #include "TArray.h"
 #include "TChain.h"
@@ -81,6 +82,12 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t PassesEventSelection();
     void FillEvent();
 
+    /* Signal Logs */
+    void BringSignalLogs();
+    Bool_t LoadSignalLogs();
+    void ClearSignalLogs();
+    void FillInjected();
+
     /* MC Generated */
     void FillMCParticles();
     Int_t GetAncestor(Int_t mcIdx, Int_t generation = 0);
@@ -90,9 +97,6 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     /* Tracks */
     void FillTracks();
     Bool_t PassesTrackSelection(AliESDtrack* track);
-
-    /* External Files */
-    Bool_t ReadSignalLogs();
 
    private:
     /* Settings ~ stored in Analysis Manager ~ all persistent */
@@ -116,11 +120,11 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     UInt_t fEventNumber;    //! event number
     Float_t fCentrality;    //! centrality percentile
 
-    /* External Files */
+    /* Signal Logs */
 
-    TString fAliEnPath;        //! loaded in `UserNotify()`
-    Bool_t fIsFirstEvent;      //!
-    TString fReactionChannel;  //! derived from `fAliEnPath` in `UserNotify()`
+    TString fAliEnPath;              //! loaded in `UserNotify()`
+    TString fReactionChannel;        //! derived from `fAliEnPath` in `UserNotify()`
+    TString fSignalLog_NewBasename;  //!
 
     /* Output */
 
@@ -164,23 +168,22 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tEvent_IsCentral;             //!
     Bool_t tEvent_IsSemiCentral;         //!
 
-    UInt_t tInjected_RunNumber;        //!
-    UInt_t tInjected_DirNumber;        //!
-    UInt_t tInjected_EventNumber;      //!
-    UInt_t tInjected_ReactionID;       //!
-    Float_t tInjected_Px;              //!
-    Float_t tInjected_Py;              //!
-    Float_t tInjected_Pz;              //!
-    Float_t tInjected_Mass;            //!
-    Int_t tInjected_Nucleon_PdgCode;   //!
-    Float_t tInjected_Nucleon_Px;      //!
-    Float_t tInjected_Nucleon_Py;      //!
-    Float_t tInjected_Nucleon_Pz;      //!
-    UInt_t tInjected_ReactionChannel;  //! char -> ASCII -> uint
+    std::map<Int_t, std::vector<UInt_t>> fMap_ReactionID;     //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Px;  //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Py;  //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Pz;  //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Px;    //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Py;    //!
+    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Pz;    //!
 
-    UInt_t tMC_RunNumber;    //! run number
-    Float_t tMC_DirNumber;   //! directory number
-    UInt_t tMC_EventNumber;  //! event number
+    UInt_t tInjected_ReactionID;   //!
+    Float_t tInjected_Px;          //!
+    Float_t tInjected_Py;          //!
+    Float_t tInjected_Pz;          //!
+    Float_t tInjected_Nucleon_Px;  //!
+    Float_t tInjected_Nucleon_Py;  //!
+    Float_t tInjected_Nucleon_Pz;  //!
+
     UInt_t tMC_Idx;          //!
     Long_t tMC_PdgCode;      //!
     Int_t tMC_Idx_Mother;    //!
@@ -201,9 +204,6 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tMC_IsSignal;     //!
     Int_t tMC_ReactionID;    //!
 
-    UInt_t tTrack_RunNumber;            //! run number
-    Float_t tTrack_DirNumber;           //! directory number
-    UInt_t tTrack_EventNumber;          //! event number
     UInt_t tTrack_Idx;                  //!
     Float_t tTrack_Px;                  //! inner parametrization
     Float_t tTrack_Py;                  //! inner parametrization

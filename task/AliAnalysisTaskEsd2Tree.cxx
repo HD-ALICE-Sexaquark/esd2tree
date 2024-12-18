@@ -26,8 +26,8 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fCentrality(0.),
       /*  */
       fAliEnPath(""),
-      fIsFirstEvent(kFALSE),
       fReactionChannel(""),
+      fSignalLog_NewBasename(""),
       /*  */
       fOutputList(nullptr),
       fHist_Centrality(nullptr),
@@ -63,23 +63,22 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tEvent_IsCentral(kFALSE),
       tEvent_IsSemiCentral(kFALSE),
       /*  */
-      tInjected_RunNumber(0),
-      tInjected_DirNumber(0),
-      tInjected_EventNumber(0),
+      fMap_ReactionID(),
+      fMap_Sexaquark_Px(),
+      fMap_Sexaquark_Py(),
+      fMap_Sexaquark_Pz(),
+      fMap_Nucleon_Px(),
+      fMap_Nucleon_Py(),
+      fMap_Nucleon_Pz(),
+      /*  */
       tInjected_ReactionID(0),
       tInjected_Px(0.),
       tInjected_Py(0.),
       tInjected_Pz(0.),
-      tInjected_Mass(0.),
-      tInjected_Nucleon_PdgCode(0),
       tInjected_Nucleon_Px(0.),
       tInjected_Nucleon_Py(0.),
       tInjected_Nucleon_Pz(0.),
-      tInjected_ReactionChannel(0),
       /*  */
-      tMC_RunNumber(0),
-      tMC_DirNumber(0),
-      tMC_EventNumber(0),
       tMC_Idx(0),
       tMC_PdgCode(0),
       tMC_Idx_Mother(0),
@@ -100,9 +99,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tMC_IsSignal(kFALSE),
       tMC_ReactionID(0),
       /*  */
-      tTrack_RunNumber(0),
-      tTrack_DirNumber(0),
-      tTrack_EventNumber(0),
       tTrack_Idx(0),
       tTrack_Px(0.),
       tTrack_Py(0.),
@@ -168,8 +164,8 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fCentrality(0.),
       /*  */
       fAliEnPath(""),
-      fIsFirstEvent(kFALSE),
       fReactionChannel(""),
+      fSignalLog_NewBasename(""),
       /*  */
       fOutputList(nullptr),
       fHist_Centrality(nullptr),
@@ -205,23 +201,22 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tEvent_IsCentral(kFALSE),
       tEvent_IsSemiCentral(kFALSE),
       /*  */
-      tInjected_RunNumber(0),
-      tInjected_DirNumber(0),
-      tInjected_EventNumber(0),
+      fMap_ReactionID(),
+      fMap_Sexaquark_Px(),
+      fMap_Sexaquark_Py(),
+      fMap_Sexaquark_Pz(),
+      fMap_Nucleon_Px(),
+      fMap_Nucleon_Py(),
+      fMap_Nucleon_Pz(),
+      /*  */
       tInjected_ReactionID(0),
       tInjected_Px(0.),
       tInjected_Py(0.),
       tInjected_Pz(0.),
-      tInjected_Mass(0.),
-      tInjected_Nucleon_PdgCode(0),
       tInjected_Nucleon_Px(0.),
       tInjected_Nucleon_Py(0.),
       tInjected_Nucleon_Pz(0.),
-      tInjected_ReactionChannel(0),
       /*  */
-      tMC_RunNumber(0),
-      tMC_DirNumber(0),
-      tMC_EventNumber(0),
       tMC_Idx(0),
       tMC_PdgCode(0),
       tMC_Idx_Mother(0),
@@ -242,9 +237,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tMC_IsSignal(kFALSE),
       tMC_ReactionID(0),
       /*  */
-      tTrack_RunNumber(0),
-      tTrack_DirNumber(0),
-      tTrack_EventNumber(0),
       tTrack_Idx(0),
       tTrack_Px(0.),
       tTrack_Py(0.),
@@ -355,11 +347,6 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
 
     fOutputFile = TFile::Open("SimpleTrees.root", "RECREATE", "Reduced ESDs");
 
-    /* Prepare injected tree */
-
-    fTree_Injected = new TTree("Injected", "Injected");
-    AssociateInjectedBranches();
-
     /* Prepare output list */
 
     fOutputList = new TList();
@@ -390,17 +377,15 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
     /* get AliEn path and tokenize it */
 
     fAliEnPath = man_file->GetName();
-    AliInfoF("AliEn Path : %s", fAliEnPath.Data());
+    if (fAliEnPath == "") AliWarning("fAliEnPath couldn't be found.");
+    AliInfoF("fAliEnPath: %s", fAliEnPath.Data());
 
     TObjArray* tokens = fAliEnPath.Tokenize("/");
-
-    fReactionChannel = "";
-
     if (fIsMC) {
         /* path of signal MC ends with format `.../LHC23l1a3/A1.73/297595/001/AliESDs.root` */
         /* and path of general purpose MC ends with format `.../LHC20e3a/297595/001/AliESDs.root` */
         fDirNumber = ((TObjString*)tokens->At(tokens->GetEntries() - 2))->GetString().Atof();
-        AliInfoF("Dir Number : %03.0f", fDirNumber);
+        AliInfoF("Dir Number : %04i", (Int_t)fDirNumber);
         if (fIsSignalMC) {
             fSignalSimSet = ((TObjString*)tokens->At(tokens->GetEntries() - 4))->GetString();
             if (fSignalSimSet[0] == 'A') fReactionChannel = "ALK0";
@@ -418,7 +403,11 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
         fDirNumber = aux_dir_nr.Atof();
     }
 
-    fIsFirstEvent = kTRUE;
+    if (fIsSignalMC) {
+        ClearSignalLogs();
+        BringSignalLogs();
+        LoadSignalLogs();
+    }
 
     return kTRUE;
 }
@@ -427,15 +416,6 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
  * Main function, called per each event at RUNTIME ~ execution on Grid.
  */
 void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
-
-    /* Handle external logs */
-
-    if (fIsFirstEvent) {
-        if (fAliEnPath == "") AliWarning("fAliEnPath couldn't be found.");
-        AliInfoF("fAliEnPath: %s", fAliEnPath.Data());
-        if (fIsSignalMC) ReadSignalLogs();
-        fIsFirstEvent = kFALSE;
-    }
 
     /* Load MC Gen. Event and PV */
 
@@ -464,23 +444,26 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
     /* Initialize event's unique identifier */
 
     TString EventUniqueID;
-    // if (!fIsMC)
-    // EventUniqueID += GetGlobalBC(fESD->GetHeader());
-    // else {
-    if (fIsSignalMC) EventUniqueID = TString::Format("%s_%6u_%04i_%03u", fSignalSimSet.Data(), fRunNumber, (Int_t)fDirNumber, fEventNumber);
-    EventUniqueID = TString::Format("%6u_%04i_%03u", fRunNumber, (Int_t)fDirNumber, fEventNumber);
-    // }
+    if (!fIsMC) {
+        // EventUniqueID += GetGlobalBC(fESD->GetHeader()); // PENDING
+    } else {
+        if (fIsSignalMC)
+            EventUniqueID = TString::Format("%s_%6u_%04i_%03u", fSignalSimSet.Data(), fRunNumber, (Int_t)fDirNumber, fEventNumber);
+        else
+            EventUniqueID = TString::Format("%6u_%04i_%03u", fRunNumber, (Int_t)fDirNumber, fEventNumber);
+    }
 
     AliInfoF("Initializing event %s", EventUniqueID.Data());
 
     fOutputDir = fOutputFile->mkdir(EventUniqueID);
 
     fTree_Event = new TTree("Event", "Event");
+    if (fIsSignalMC) fTree_Injected = new TTree("Injected", "Injected");
     fTree_MC = new TTree("MC", "MC");
     fTree_Tracks = new TTree("Tracks", "Tracks");
 
     AssociateEventsBranches();
-    // AssociateInjectedBranches();
+    if (fIsSignalMC) AssociateInjectedBranches();
     AssociateMCParticlesBranches();
     AssociateTracksBranches();
 
@@ -496,10 +479,12 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
     /* Fill trees */
 
     FillEvent();
+    if (fIsSignalMC) FillInjected();
     FillMCParticles();
     FillTracks();
 
     WriteTree(fTree_Event);
+    if (fIsSignalMC) WriteTree(fTree_Injected);
     WriteTree(fTree_MC);
     WriteTree(fTree_Tracks);
 
@@ -657,28 +642,19 @@ void AliAnalysisTaskEsd2Tree::AssociateEventsBranches() {
  * Add branches to `fTree_Injected`.
  */
 void AliAnalysisTaskEsd2Tree::AssociateInjectedBranches() {
-    fTree_Injected->Branch("RunNumber", &tInjected_RunNumber, "RunNumber/i");
-    fTree_Injected->Branch("DirNumber", &tInjected_DirNumber, "DirNumber/i");
-    fTree_Injected->Branch("EventNumber", &tInjected_EventNumber, "EventNumber/i");
     fTree_Injected->Branch("ReactionID", &tInjected_ReactionID, "ReactionID/i");
     fTree_Injected->Branch("Px", &tInjected_Px, "Px/F");
     fTree_Injected->Branch("Py", &tInjected_Py, "Py/F");
     fTree_Injected->Branch("Pz", &tInjected_Pz, "Pz/F");
-    fTree_Injected->Branch("Mass", &tInjected_Mass, "Mass/F");
-    fTree_Injected->Branch("Nucleon_PdgCode", &tInjected_Nucleon_PdgCode, "Nucleon_PdgCode/I");
     fTree_Injected->Branch("Nucleon_Px", &tInjected_Nucleon_Px, "Nucleon_Px/F");
     fTree_Injected->Branch("Nucleon_Py", &tInjected_Nucleon_Py, "Nucleon_Py/F");
     fTree_Injected->Branch("Nucleon_Pz", &tInjected_Nucleon_Pz, "Nucleon_Pz/F");
-    fTree_Injected->Branch("ReactionChannel", &tInjected_ReactionChannel, "ReactionChannel/i");
 }
 
 /*
  * Add branches to `fTree_MC`.
  */
 void AliAnalysisTaskEsd2Tree::AssociateMCParticlesBranches() {
-    fTree_MC->Branch("RunNumber", &tMC_RunNumber, "RunNumber/i");
-    fTree_MC->Branch("DirNumber", &tMC_DirNumber, "DirNumber/F");
-    fTree_MC->Branch("EventNumber", &tMC_EventNumber, "EventNumber/i");
     fTree_MC->Branch("Idx", &tMC_Idx, "Idx/i");
     fTree_MC->Branch("PdgCode", &tMC_PdgCode, "PdgCode/L");
     fTree_MC->Branch("Idx_Mother", &tMC_Idx_Mother, "Idx_Mother/I");
@@ -704,9 +680,6 @@ void AliAnalysisTaskEsd2Tree::AssociateMCParticlesBranches() {
  * Add branches to `fTree_Tracks`.
  */
 void AliAnalysisTaskEsd2Tree::AssociateTracksBranches() {
-    fTree_Tracks->Branch("RunNumber", &tTrack_RunNumber, "RunNumber/i");
-    fTree_Tracks->Branch("DirNumber", &tTrack_DirNumber, "DirNumber/F");
-    fTree_Tracks->Branch("EventNumber", &tTrack_EventNumber, "EventNumber/i");
     fTree_Tracks->Branch("Idx", &tTrack_Idx, "Idx/i");
     fTree_Tracks->Branch("Px", &tTrack_Px, "Px/F");
     fTree_Tracks->Branch("Py", &tTrack_Py, "Py/F");
@@ -767,9 +740,6 @@ void AliAnalysisTaskEsd2Tree::FillMCParticles() {
 
         /* Assign branches and fill tree */
 
-        tMC_RunNumber = fRunNumber;
-        tMC_DirNumber = fDirNumber;
-        tMC_EventNumber = fEventNumber;
         tMC_Idx = mcIdx;
         tMC_PdgCode = pdg_code;
         tMC_Idx_Mother = mcPart->GetMother();
@@ -863,9 +833,6 @@ void AliAnalysisTaskEsd2Tree::FillTracks() {
 
         /* Assign branches and fill tree */
 
-        tTrack_RunNumber = fRunNumber;
-        tTrack_DirNumber = fDirNumber;
-        tTrack_EventNumber = fEventNumber;
         tTrack_Idx = esdIdx;
         trackInnerParam->GetPxPyPz(momentum);
         tTrack_Px = (Float_t)momentum[0];
@@ -947,20 +914,20 @@ Bool_t AliAnalysisTaskEsd2Tree::PassesTrackSelection(AliESDtrack* track) {
     return kTRUE;
 }
 
-/*                    */
-/**  External Files  **/
-/*** ============== ***/
+/*                 */
+/**  Signal Logs  **/
+/*** =========== ***/
 
 /*
  * Open the respective `sim.log` that corresponds to the `RunNumber+DirNumber` that's being analyzed.
  * From it, read the injected anti-sexaquark and struck nucleon kinematics and store them into a tree.
  */
-Bool_t AliAnalysisTaskEsd2Tree::ReadSignalLogs() {
+void AliAnalysisTaskEsd2Tree::BringSignalLogs() {
 
     TGrid* alien = nullptr;
     if (!gGrid) {
         alien = TGrid::Connect("alien://");
-        if (!alien) return kFALSE;
+        if (!alien) return;
     }
 
     TString AliEn_Dir = fAliEnPath(0, fAliEnPath.Last('/'));
@@ -974,20 +941,29 @@ Bool_t AliAnalysisTaskEsd2Tree::ReadSignalLogs() {
     Int_t AliEn_RunNumber = ((TObjString*)tokens->At(tokens->GetEntries() - 3))->GetString().Atoi();
     TString AliEn_SimSubSet = ((TObjString*)tokens->At(tokens->GetEntries() - 4))->GetString();
 
-    TString Log_NewBasename = Form("sim_%s_%i_%03i.log", AliEn_SimSubSet.Data(), AliEn_RunNumber, AliEn_DirNumber);
+    fSignalLog_NewBasename = Form("sim_%s_%i_%03i.log", AliEn_SimSubSet.Data(), AliEn_RunNumber, AliEn_DirNumber);
 
     if (AliEn_Dir.BeginsWith("alien://")) {
-        gSystem->Exec(Form("alien.py cp %s file://./%s", orig_path.Data(), Log_NewBasename.Data()));
+        gSystem->Exec(Form("alien.py cp %s file://./%s", orig_path.Data(), fSignalLog_NewBasename.Data()));
     } else {
-        gSystem->Exec(Form("cp %s ./%s", orig_path.Data(), Log_NewBasename.Data()));
+        gSystem->Exec(Form("cp %s ./%s", orig_path.Data(), fSignalLog_NewBasename.Data()));
     }
 
-    TString new_path = Form("%s/%s", gSystem->pwd(), Log_NewBasename.Data());
-    AliInfoF("Reading file %s ...", new_path.Data());
+    TString new_path = Form("%s/%s", gSystem->pwd(), fSignalLog_NewBasename.Data());
+    AliInfoF("Signal log file ready at %s ...", new_path.Data());
+}
 
-    std::ifstream SimLog(new_path);
-    if (!SimLog.is_open()) {
-        AliInfo("Unable to open file");
+/*
+ * Load injected anti-sexaquark and struck nucleon info.
+ * From the `sim.log` file that corresponds to an entire dir number into memory.
+ */
+Bool_t AliAnalysisTaskEsd2Tree::LoadSignalLogs() {
+    TString new_path = Form("%s/%s", gSystem->pwd(), fSignalLog_NewBasename.Data());
+
+    AliInfoF("Opening file %s ...", new_path.Data());
+    std::ifstream SignalLog(new_path);
+    if (!SignalLog.is_open()) {
+        AliWarningF("Unable to open file %s", new_path.Data());
         return kFALSE;
     }
 
@@ -1002,7 +978,7 @@ Bool_t AliAnalysisTaskEsd2Tree::ReadSignalLogs() {
 
     /* Read lines */
 
-    while (std::getline(SimLog, cstr_line)) {
+    while (std::getline(SignalLog, cstr_line)) {
 
         tstr_line = cstr_line;
 
@@ -1014,27 +990,50 @@ Bool_t AliAnalysisTaskEsd2Tree::ReadSignalLogs() {
         csv = static_cast<TString>(tstr_line(38, tstr_line.Length() - 1));
         csv_arr = csv.Tokenize(",");
 
-        /* Assign branches and fill tree */
+        /* Load content to memory */
 
-        tInjected_RunNumber = AliEn_RunNumber;
-        tInjected_DirNumber = AliEn_DirNumber;  // PENDING: could be another var to simplify things
-        tInjected_EventNumber = CurrentEventNumber;
-        tInjected_ReactionID = dynamic_cast<TObjString*>(csv_arr->At(0))->String().Atoi();
-        tInjected_Px = dynamic_cast<TObjString*>(csv_arr->At(1))->String().Atof();
-        tInjected_Py = dynamic_cast<TObjString*>(csv_arr->At(2))->String().Atof();
-        tInjected_Pz = dynamic_cast<TObjString*>(csv_arr->At(3))->String().Atof();
-        tInjected_Mass = TString(AliEn_SimSubSet(1, 4)).Atof();
-        tInjected_Nucleon_PdgCode = AliEn_SimSubSet[0] == 'A' ? 2112 : 2212;  // considering only ADEH
-        tInjected_Nucleon_Px = dynamic_cast<TObjString*>(csv_arr->At(4))->String().Atof();
-        tInjected_Nucleon_Py = dynamic_cast<TObjString*>(csv_arr->At(5))->String().Atof();
-        tInjected_Nucleon_Pz = dynamic_cast<TObjString*>(csv_arr->At(6))->String().Atof();
-        tInjected_ReactionChannel = (UInt_t)AliEn_SimSubSet[0];
-
-        fTree_Injected->Fill();
+        fMap_ReactionID[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(0))->String().Atoi());
+        fMap_Sexaquark_Px[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(1))->String().Atof());
+        fMap_Sexaquark_Py[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(2))->String().Atof());
+        fMap_Sexaquark_Pz[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(3))->String().Atof());
+        fMap_Nucleon_Px[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(4))->String().Atof());
+        fMap_Nucleon_Py[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(5))->String().Atof());
+        fMap_Nucleon_Pz[CurrentEventNumber].push_back(dynamic_cast<TObjString*>(csv_arr->At(6))->String().Atof());
     }  // end of loop over lines
 
-    AliInfo("Closing file ...");
-    SimLog.close();
+    AliInfoF("Closing file %s ...", new_path.Data());
+    SignalLog.close();
 
     return kTRUE;
+}
+
+/*
+ * Clear the maps from memory.
+ */
+void AliAnalysisTaskEsd2Tree::ClearSignalLogs() {
+    fMap_ReactionID.clear();
+    fMap_Sexaquark_Px.clear();
+    fMap_Sexaquark_Py.clear();
+    fMap_Sexaquark_Pz.clear();
+    fMap_Nucleon_Px.clear();
+    fMap_Nucleon_Py.clear();
+    fMap_Nucleon_Pz.clear();
+}
+
+/*
+ * Assign the in-memory values to the tree branches.
+ */
+void AliAnalysisTaskEsd2Tree::FillInjected() {
+    ULong_t Bytes = 0;
+    for (Int_t i = 0; i < (Int_t)fMap_ReactionID[fEventNumber].size(); i++) {
+        tInjected_ReactionID = fMap_ReactionID[fEventNumber][i];
+        tInjected_Px = fMap_Sexaquark_Px[fEventNumber][i];
+        tInjected_Py = fMap_Sexaquark_Py[fEventNumber][i];
+        tInjected_Pz = fMap_Sexaquark_Pz[fEventNumber][i];
+        tInjected_Nucleon_Px = fMap_Nucleon_Px[fEventNumber][i];
+        tInjected_Nucleon_Py = fMap_Nucleon_Py[fEventNumber][i];
+        tInjected_Nucleon_Pz = fMap_Nucleon_Pz[fEventNumber][i];
+        Bytes += fTree_Injected->Fill();
+    }
+    AliInfoF("sizeof(%s/%s) = %lu bytes", fOutputDir->GetName(), fTree_Injected->GetName(), Bytes);
 }
