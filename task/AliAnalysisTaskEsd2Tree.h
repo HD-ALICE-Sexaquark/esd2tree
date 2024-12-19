@@ -74,7 +74,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     /* Trees */
     void AssociateEventsBranches();
     void AssociateInjectedBranches();
-    void AssociateMCParticlesBranches();
+    void AssociateMCBranches();
     void AssociateTracksBranches();
     void WriteTree(TTree* thisTree);
 
@@ -88,10 +88,9 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     void ClearSignalLogs();
     void FillInjected();
 
-    /* MC Generated */
-    void FillMCParticles();
+    /* MC Particles */
+    void FillMC();
     Int_t GetAncestor(Int_t mcIdx, Int_t generation = 0);
-    Short_t GetGenerator(Int_t mcIdx);
     Int_t GetReactionID(Int_t mcIdx, Int_t ancestorIdx);
 
     /* Tracks */
@@ -141,7 +140,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
     /** Trees **/
 
-    TTree* fTree_Event;     //!
+    TTree* fTree_Events;    //!
     TTree* fTree_Injected;  //!
     TTree* fTree_MC;        //!
     TTree* fTree_Tracks;    //!
@@ -184,25 +183,23 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tInjected_Nucleon_Py;  //!
     Float_t tInjected_Nucleon_Pz;  //!
 
-    UInt_t tMC_Idx;          //!
-    Long_t tMC_PdgCode;      //!
-    Int_t tMC_Idx_Mother;    //!
-    Int_t tMC_NDaughters;    //!
-    Int_t tMC_Idx_FirstDau;  //!
-    Int_t tMC_Idx_LastDau;   //!
-    Int_t tMC_Idx_Ancestor;  //!
-    Float_t tMC_Px;          //!
-    Float_t tMC_Py;          //!
-    Float_t tMC_Pz;          //!
-    Float_t tMC_Xv;          //! origin x-vertex
-    Float_t tMC_Yv;          //! origin y-vertex
-    Float_t tMC_Zv;          //! origin z-vertex
-    UInt_t tMC_Status;       //!
-    Bool_t tMC_IsOOBPileup;  //!
-    Short_t tMC_Generator;   //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
-    Bool_t tMC_IsSecondary;  //!
-    Bool_t tMC_IsSignal;     //!
-    Int_t tMC_ReactionID;    //!
+    UInt_t tMC_Idx;            //!
+    Int_t tMC_PdgCode;         //!
+    Int_t tMC_Idx_Mother;      //!
+    Int_t tMC_Idx_Ancestor;    //!
+    Float_t tMC_Px;            //!
+    Float_t tMC_Py;            //!
+    Float_t tMC_Pz;            //!
+    Float_t tMC_Xv;            //! origin x-vertex
+    Float_t tMC_Yv;            //! origin y-vertex
+    Float_t tMC_Zv;            //! origin z-vertex
+    UInt_t tMC_Status;         //!
+    Bool_t tMC_IsOOBPileup;    //!
+    Short_t tMC_Generator;     //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
+    Bool_t tMC_IsPrimary;      //!
+    Bool_t tMC_IsSecFromMat;   //!
+    Bool_t tMC_IsSecFromWeak;  //!
+    Int_t tMC_ReactionID;      //!
 
     UInt_t tTrack_Idx;                  //!
     Float_t tTrack_Px;                  //! inner parametrization
