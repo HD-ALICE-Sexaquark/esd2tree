@@ -345,7 +345,11 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
 
     /* Prepare output file */
 
-    fOutputFile = TFile::Open("SimpleTrees.root", "RECREATE", "Reduced ESDs");
+    fOutputFile = TFile::Open("SimpleTrees.root", "RECREATE", "Reduced ESDs", 505);
+
+    // events tree ~ higher level
+    fTree_Event = new TTree("Event", "Event");
+    AssociateEventsBranches();
 
     /* Prepare output list */
 
@@ -450,21 +454,23 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
         if (fIsSignalMC)
             EventUniqueID = TString::Format("%s_%6u_%04i_%03u", fSignalSimSet.Data(), fRunNumber, (Int_t)fDirNumber, fEventNumber);
         else
-            EventUniqueID = TString::Format("%6u_%04i_%03u", fRunNumber, (Int_t)fDirNumber, fEventNumber);
+            EventUniqueID = TString::Format("BKG_%6u_%04i_%03u", fRunNumber, (Int_t)fDirNumber, fEventNumber);
     }
 
     AliInfoF("Initializing event %s", EventUniqueID.Data());
 
+    // rest of trees ~ inside TDirectory
     fOutputDir = fOutputFile->mkdir(EventUniqueID);
 
-    fTree_Event = new TTree("Event", "Event");
-    if (fIsSignalMC) fTree_Injected = new TTree("Injected", "Injected");
-    fTree_MC = new TTree("MC", "MC");
-    fTree_Tracks = new TTree("Tracks", "Tracks");
+    if (fIsSignalMC) {
+        fTree_Injected = new TTree("Injected", "Injected");
+        AssociateInjectedBranches();
+    }
 
-    AssociateEventsBranches();
-    if (fIsSignalMC) AssociateInjectedBranches();
+    fTree_MC = new TTree("MC", "MC");
     AssociateMCParticlesBranches();
+
+    fTree_Tracks = new TTree("Tracks", "Tracks");
     AssociateTracksBranches();
 
     /* Centrality */
@@ -483,7 +489,9 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
     FillMCParticles();
     FillTracks();
 
-    WriteTree(fTree_Event);
+    /* Write trees */
+
+    fOutputDir->cd();  // inside TDirectory
     if (fIsSignalMC) WriteTree(fTree_Injected);
     WriteTree(fTree_MC);
     WriteTree(fTree_Tracks);
@@ -497,9 +505,6 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
  *
  */
 void AliAnalysisTaskEsd2Tree::WriteTree(TTree* thisTree) {
-    if (!fOutputDir) AliFatal("Subdirectory couldn't be found");
-    fOutputDir->cd();
-
     if (!thisTree) return;
     AliInfoF("Writing %s/%s", fOutputDir->GetName(), thisTree->GetName());
     thisTree->Write();
@@ -511,6 +516,9 @@ void AliAnalysisTaskEsd2Tree::WriteTree(TTree* thisTree) {
  *
  */
 void AliAnalysisTaskEsd2Tree::FinishTaskOutput() {
+    fOutputFile->cd();  // above TDirectory
+    WriteTree(fTree_Event);
+
     AliInfoF("Writing file %s", fOutputFile->GetName());
     fOutputFile->Write();
 }
