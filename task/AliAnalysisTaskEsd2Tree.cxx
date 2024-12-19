@@ -21,7 +21,8 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       /*  */
       fSignalSimSet(""),
       fRunNumber(0),
-      fDirNumber(0.),
+      fDirNumber(0),
+      fDirNumberB(0),
       fEventNumber(0),
       fCentrality(0.),
       /*  */
@@ -36,7 +37,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fOutputFile(nullptr),
       fOutputDir(nullptr),
       /*  */
-      fTree_Event(nullptr),
+      fTree_Events(nullptr),
       fTree_Injected(nullptr),
       fTree_MC(nullptr),
       fTree_Tracks(nullptr),
@@ -82,9 +83,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tMC_Idx(0),
       tMC_PdgCode(0),
       tMC_Idx_Mother(0),
-      tMC_NDaughters(0),
-      tMC_Idx_FirstDau(0),
-      tMC_Idx_LastDau(0),
       tMC_Idx_Ancestor(0),
       tMC_Px(0.),
       tMC_Py(0.),
@@ -95,8 +93,9 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tMC_Status(0),
       tMC_IsOOBPileup(kFALSE),
       tMC_Generator(0),
-      tMC_IsSecondary(kFALSE),
-      tMC_IsSignal(kFALSE),
+      tMC_IsPrimary(kFALSE),
+      tMC_IsSecFromMat(kFALSE),
+      tMC_IsSecFromWeak(kFALSE),
       tMC_ReactionID(0),
       /*  */
       tTrack_Idx(0),
@@ -159,7 +158,8 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       /*  */
       fSignalSimSet(""),
       fRunNumber(0),
-      fDirNumber(0.),
+      fDirNumber(0),
+      fDirNumberB(0),
       fEventNumber(0),
       fCentrality(0.),
       /*  */
@@ -174,7 +174,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fOutputFile(nullptr),
       fOutputDir(nullptr),
       /*  */
-      fTree_Event(nullptr),
+      fTree_Events(nullptr),
       fTree_Injected(nullptr),
       fTree_MC(nullptr),
       fTree_Tracks(nullptr),
@@ -220,9 +220,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tMC_Idx(0),
       tMC_PdgCode(0),
       tMC_Idx_Mother(0),
-      tMC_NDaughters(0),
-      tMC_Idx_FirstDau(0),
-      tMC_Idx_LastDau(0),
       tMC_Idx_Ancestor(0),
       tMC_Px(0.),
       tMC_Py(0.),
@@ -233,8 +230,9 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tMC_Status(0),
       tMC_IsOOBPileup(kFALSE),
       tMC_Generator(0),
-      tMC_IsSecondary(kFALSE),
-      tMC_IsSignal(kFALSE),
+      tMC_IsPrimary(kFALSE),
+      tMC_IsSecFromMat(kFALSE),
+      tMC_IsSecFromWeak(kFALSE),
       tMC_ReactionID(0),
       /*  */
       tTrack_Idx(0),
@@ -348,7 +346,7 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
     fOutputFile = TFile::Open("SimpleTrees.root", "RECREATE", "Reduced ESDs", 505);
 
     // events tree ~ higher level
-    fTree_Event = new TTree("Event", "Event");
+    fTree_Events = new TTree("Events", "Events");
     AssociateEventsBranches();
 
     /* Prepare output list */
@@ -398,19 +396,18 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
             if (fSignalSimSet[0] == 'H') fReactionChannel = "PKPKX";
             AliInfoF("Signal Simulation Set : %s", fSignalSimSet.Data());
             AliInfoF("Reaction Channel      : %s", fReactionChannel.Data());
+
+            ClearSignalLogs();
+            BringSignalLogs();
+            LoadSignalLogs();
         }
-    } else {  // fIsMC == kFALSE (data)
+    } else {
         /* path of data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root` */
         TString aux_dir_nr = ((TObjString*)tokens->At(tokens->GetEntries() - 2))->GetString();
-        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 8));
+        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 8));  // = "039.914"
         AliInfoF("Dir Number : %s", aux_dir_nr.Data());
-        fDirNumber = aux_dir_nr.Atof();
-    }
-
-    if (fIsSignalMC) {
-        ClearSignalLogs();
-        BringSignalLogs();
-        LoadSignalLogs();
+        fDirNumber = TString(aux_dir_nr(0, 3)).Atoi();   // = 39
+        fDirNumberB = TString(aux_dir_nr(4, 4)).Atoi();  // = 914
     }
 
     return kTRUE;
@@ -448,27 +445,28 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
     /* Initialize event's unique identifier */
 
     TString EventUniqueID;
-    if (!fIsMC) {
-        // EventUniqueID += GetGlobalBC(fESD->GetHeader()); // PENDING
-    } else {
+    if (fIsMC) {
         if (fIsSignalMC)
-            EventUniqueID = TString::Format("%s_%6u_%04i_%03u", fSignalSimSet.Data(), fRunNumber, (Int_t)fDirNumber, fEventNumber);
+            EventUniqueID = TString::Format("%s_%6u_%04u_%03u", fSignalSimSet.ReplaceAll(".", "").Data(), fRunNumber, fDirNumber, fEventNumber);
         else
-            EventUniqueID = TString::Format("BKG_%6u_%04i_%03u", fRunNumber, (Int_t)fDirNumber, fEventNumber);
+            EventUniqueID = TString::Format("BKG_%6u_%04u_%03u", fRunNumber, fDirNumber, fEventNumber);
+    } else {
+        EventUniqueID = TString::Format("DATA_%6u_%03u_%u_%03u", fRunNumber, fDirNumber, fDirNumberB, fEventNumber);
     }
 
     AliInfoF("Initializing event %s", EventUniqueID.Data());
 
-    // rest of trees ~ inside TDirectory
+    // inside TDirectory
     fOutputDir = fOutputFile->mkdir(EventUniqueID);
 
-    if (fIsSignalMC) {
-        fTree_Injected = new TTree("Injected", "Injected");
-        AssociateInjectedBranches();
+    if (fIsMC) {
+        if (fIsSignalMC) {
+            fTree_Injected = new TTree("Injected", "Injected");
+            AssociateInjectedBranches();
+        }
+        fTree_MC = new TTree("MC", "MC");
+        AssociateMCBranches();
     }
-
-    fTree_MC = new TTree("MC", "MC");
-    AssociateMCParticlesBranches();
 
     fTree_Tracks = new TTree("Tracks", "Tracks");
     AssociateTracksBranches();
@@ -485,15 +483,19 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
     /* Fill trees */
 
     FillEvent();
-    if (fIsSignalMC) FillInjected();
-    FillMCParticles();
+    if (fIsMC) {
+        if (fIsSignalMC) FillInjected();
+        FillMC();
+    }
     FillTracks();
 
     /* Write trees */
 
     fOutputDir->cd();  // inside TDirectory
-    if (fIsSignalMC) WriteTree(fTree_Injected);
-    WriteTree(fTree_MC);
+    if (fIsMC) {
+        if (fIsSignalMC) WriteTree(fTree_Injected);
+        WriteTree(fTree_MC);
+    }
     WriteTree(fTree_Tracks);
 
     /* Post data */
@@ -506,7 +508,9 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
  */
 void AliAnalysisTaskEsd2Tree::WriteTree(TTree* thisTree) {
     if (!thisTree) return;
-    AliInfoF("Writing %s/%s", fOutputDir->GetName(), thisTree->GetName());
+    AliInfoF("Writing %s/%s",                                                        //
+             TString(thisTree->GetName()) == "Events" ? "" : fOutputDir->GetName(),  //
+             thisTree->GetName());
     thisTree->Write();
     delete thisTree;
     thisTree = nullptr;
@@ -516,8 +520,8 @@ void AliAnalysisTaskEsd2Tree::WriteTree(TTree* thisTree) {
  *
  */
 void AliAnalysisTaskEsd2Tree::FinishTaskOutput() {
-    fOutputFile->cd();  // above TDirectory
-    WriteTree(fTree_Event);
+    fOutputFile->cd();  // above `fOutputDir`
+    WriteTree(fTree_Events);
 
     AliInfoF("Writing file %s", fOutputFile->GetName());
     fOutputFile->Write();
@@ -607,8 +611,7 @@ void AliAnalysisTaskEsd2Tree::FillEvent() {
     tEvent_IsCentral = fInputHandler->IsEventSelected() & AliVEvent::kCentral;
     tEvent_IsSemiCentral = fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral;
 
-    ULong_t Bytes = fTree_Event->Fill();
-    AliInfoF("sizeof(%s/%s) = %lu bytes", fOutputDir->GetName(), fTree_Event->GetName(), Bytes);
+    fTree_Events->Fill();
 }
 
 /*           */
@@ -616,34 +619,35 @@ void AliAnalysisTaskEsd2Tree::FillEvent() {
 /*** ===== ***/
 
 /*
- * Add branches to `fTree_Event`.
+ * Add branches to `fTree_Events`.
  */
 void AliAnalysisTaskEsd2Tree::AssociateEventsBranches() {
-    fTree_Event->Branch("RunNumber", &fRunNumber, "RunNumber/i");
-    fTree_Event->Branch("DirNumber", &fDirNumber, "DirNumber/F");
-    fTree_Event->Branch("EventNumber", &fEventNumber, "EventNumber/i");
-    fTree_Event->Branch("Centrality", &fCentrality, "Centrality/F");
-    fTree_Event->Branch("PV_TrueXv", &tEvent_PV_TrueXv, "PV_TrueXv/F");
-    fTree_Event->Branch("PV_TrueYv", &tEvent_PV_TrueYv, "PV_TrueYv/F");
-    fTree_Event->Branch("PV_TrueZv", &tEvent_PV_TrueZv, "PV_TrueZv/F");
-    fTree_Event->Branch("IsGenPileup", &tEvent_IsGenPileup, "IsGenPileup/O");
-    fTree_Event->Branch("IsSBCPileup", &tEvent_IsSBCPileup, "IsSBCPileup/O");
-    fTree_Event->Branch("PV_RecXv", &tEvent_PV_RecXv, "PV_RecXv/F");
-    fTree_Event->Branch("PV_RecYv", &tEvent_PV_RecYv, "PV_RecYv/F");
-    fTree_Event->Branch("PV_RecZv", &tEvent_PV_RecZv, "PV_RecZv/F");
-    fTree_Event->Branch("PV_NContributors", &tEvent_PV_NContributors, "PV_NContributors/I");
-    fTree_Event->Branch("PV_ZvErr_FromSPD", &tEvent_PV_ZvErr_FromSPD, "PV_ZvErr_FromSPD/F");
-    fTree_Event->Branch("PV_ZvErr_FromTracks", &tEvent_PV_ZvErr_FromTracks, "PV_ZvErr_FromTracks/F");
-    fTree_Event->Branch("PV_Zv_FromSPD", &tEvent_PV_Zv_FromSPD, "PV_Zv_FromSPD/F");
-    fTree_Event->Branch("PV_Zv_FromTracks", &tEvent_PV_Zv_FromTracks, "PV_Zv_FromTracks/F");
-    fTree_Event->Branch("PV_Dispersion", &tEvent_PV_Dispersion, "PV_Dispersion/F");
-    fTree_Event->Branch("NTracks", &tEvent_NTracks, "NTracks/i");
-    fTree_Event->Branch("NTPCClusters", &tEvent_NTPCClusters, "NTPCClusters/I");
-    fTree_Event->Branch("IsMB", &tEvent_IsMB, "IsMB/O");
-    fTree_Event->Branch("IsHighMultV0", &tEvent_IsHighMultV0, "IsHighMultV0/O");
-    fTree_Event->Branch("IsHighMultSPD", &tEvent_IsHighMultSPD, "IsHighMultSPD/O");
-    fTree_Event->Branch("IsCentral", &tEvent_IsCentral, "IsCentral/O");
-    fTree_Event->Branch("IsSemiCentral", &tEvent_IsSemiCentral, "IsSemiCentral/O");
+    fTree_Events->Branch("RunNumber", &fRunNumber, "RunNumber/i");
+    fTree_Events->Branch("DirNumber", &fDirNumber, "DirNumber/i");
+    if (!fIsMC) fTree_Events->Branch("DirNumberB", &fDirNumberB, "DirNumberB/i");
+    fTree_Events->Branch("EventNumber", &fEventNumber, "EventNumber/i");
+    fTree_Events->Branch("Centrality", &fCentrality, "Centrality/F");
+    fTree_Events->Branch("PV_TrueXv", &tEvent_PV_TrueXv, "PV_TrueXv/F");
+    fTree_Events->Branch("PV_TrueYv", &tEvent_PV_TrueYv, "PV_TrueYv/F");
+    fTree_Events->Branch("PV_TrueZv", &tEvent_PV_TrueZv, "PV_TrueZv/F");
+    fTree_Events->Branch("IsGenPileup", &tEvent_IsGenPileup, "IsGenPileup/O");
+    fTree_Events->Branch("IsSBCPileup", &tEvent_IsSBCPileup, "IsSBCPileup/O");
+    fTree_Events->Branch("PV_RecXv", &tEvent_PV_RecXv, "PV_RecXv/F");
+    fTree_Events->Branch("PV_RecYv", &tEvent_PV_RecYv, "PV_RecYv/F");
+    fTree_Events->Branch("PV_RecZv", &tEvent_PV_RecZv, "PV_RecZv/F");
+    fTree_Events->Branch("PV_NContributors", &tEvent_PV_NContributors, "PV_NContributors/I");
+    fTree_Events->Branch("PV_ZvErr_FromSPD", &tEvent_PV_ZvErr_FromSPD, "PV_ZvErr_FromSPD/F");
+    fTree_Events->Branch("PV_ZvErr_FromTracks", &tEvent_PV_ZvErr_FromTracks, "PV_ZvErr_FromTracks/F");
+    fTree_Events->Branch("PV_Zv_FromSPD", &tEvent_PV_Zv_FromSPD, "PV_Zv_FromSPD/F");
+    fTree_Events->Branch("PV_Zv_FromTracks", &tEvent_PV_Zv_FromTracks, "PV_Zv_FromTracks/F");
+    fTree_Events->Branch("PV_Dispersion", &tEvent_PV_Dispersion, "PV_Dispersion/F");
+    fTree_Events->Branch("NTracks", &tEvent_NTracks, "NTracks/i");
+    fTree_Events->Branch("NTPCClusters", &tEvent_NTPCClusters, "NTPCClusters/I");
+    fTree_Events->Branch("IsMB", &tEvent_IsMB, "IsMB/O");
+    fTree_Events->Branch("IsHighMultV0", &tEvent_IsHighMultV0, "IsHighMultV0/O");
+    fTree_Events->Branch("IsHighMultSPD", &tEvent_IsHighMultSPD, "IsHighMultSPD/O");
+    fTree_Events->Branch("IsCentral", &tEvent_IsCentral, "IsCentral/O");
+    fTree_Events->Branch("IsSemiCentral", &tEvent_IsSemiCentral, "IsSemiCentral/O");
 }
 
 /*
@@ -662,13 +666,10 @@ void AliAnalysisTaskEsd2Tree::AssociateInjectedBranches() {
 /*
  * Add branches to `fTree_MC`.
  */
-void AliAnalysisTaskEsd2Tree::AssociateMCParticlesBranches() {
+void AliAnalysisTaskEsd2Tree::AssociateMCBranches() {
     fTree_MC->Branch("Idx", &tMC_Idx, "Idx/i");
-    fTree_MC->Branch("PdgCode", &tMC_PdgCode, "PdgCode/L");
+    fTree_MC->Branch("PdgCode", &tMC_PdgCode, "PdgCode/I");
     fTree_MC->Branch("Idx_Mother", &tMC_Idx_Mother, "Idx_Mother/I");
-    fTree_MC->Branch("NDaughters", &tMC_NDaughters, "NDaughters/I");
-    fTree_MC->Branch("Idx_FirstDau", &tMC_Idx_FirstDau, "Idx_FirstDau/I");
-    fTree_MC->Branch("Idx_LastDau", &tMC_Idx_LastDau, "Idx_LastDau/I");
     fTree_MC->Branch("Idx_Ancestor", &tMC_Idx_Ancestor, "Idx_Ancestor/I");
     fTree_MC->Branch("Px", &tMC_Px, "Px/F");
     fTree_MC->Branch("Py", &tMC_Py, "Py/F");
@@ -679,8 +680,9 @@ void AliAnalysisTaskEsd2Tree::AssociateMCParticlesBranches() {
     fTree_MC->Branch("Status", &tMC_Status, "Status/i");
     fTree_MC->Branch("IsOOBPileup", &tMC_IsOOBPileup, "IsOOBPileup/O");
     fTree_MC->Branch("Generator", &tMC_Generator, "Generator/S");
-    fTree_MC->Branch("IsSecondary", &tMC_IsSecondary, "IsSecondary/O");
-    fTree_MC->Branch("IsSignal", &tMC_IsSignal, "IsSignal/O");
+    fTree_MC->Branch("IsPrimary", &tMC_IsPrimary, "IsPrimary/O");
+    fTree_MC->Branch("IsSecFromMat", &tMC_IsSecFromMat, "IsSecFromMat/O");
+    fTree_MC->Branch("IsSecFromWeak", &tMC_IsSecFromWeak, "IsSecFromWeak/O");
     fTree_MC->Branch("ReactionID", &tMC_ReactionID, "ReactionID/I");
 }
 
@@ -725,35 +727,23 @@ void AliAnalysisTaskEsd2Tree::AssociateTracksBranches() {
 /*
  * Loop over MC particles in a single event. Store the indices of the signal particles.
  */
-void AliAnalysisTaskEsd2Tree::FillMCParticles() {
+void AliAnalysisTaskEsd2Tree::FillMC() {
 
     AliMCParticle* mcPart;
-
-    Int_t pdg_code;
-    Short_t generator;
-    Int_t ancestor_idx;
-    Bool_t is_signal;
-
-    ULong_t Bytes = 0;
 
     for (Int_t mcIdx = 0; mcIdx < fMC->GetNumberOfTracks(); mcIdx++) {
 
         mcPart = (AliMCParticle*)fMC->GetTrack(mcIdx);
         if (!mcPart) continue;
+        if (mcPart->P() < 0.01) continue;
 
-        pdg_code = mcPart->PdgCode();
-        ancestor_idx = GetAncestor(mcIdx);
-        generator = GetGenerator(mcIdx);
-        is_signal = generator == 2;
+        Int_t ancestor_idx = GetAncestor(mcIdx);
 
         /* Assign branches and fill tree */
 
         tMC_Idx = mcIdx;
-        tMC_PdgCode = pdg_code;
+        tMC_PdgCode = mcPart->PdgCode();
         tMC_Idx_Mother = mcPart->GetMother();
-        tMC_NDaughters = mcPart->GetNDaughters();
-        tMC_Idx_FirstDau = mcPart->GetDaughterFirst();
-        tMC_Idx_LastDau = mcPart->GetDaughterLast();
         tMC_Idx_Ancestor = ancestor_idx;
         tMC_Px = (Float_t)mcPart->Px();
         tMC_Py = (Float_t)mcPart->Py();
@@ -763,14 +753,14 @@ void AliAnalysisTaskEsd2Tree::FillMCParticles() {
         tMC_Zv = (Float_t)mcPart->Zv();
         tMC_Status = mcPart->MCStatusCode();
         tMC_IsOOBPileup = AliAnalysisUtils::IsParticleFromOutOfBunchPileupCollision(mcIdx, fMC);
-        tMC_Generator = generator;
-        tMC_IsSecondary = mcPart->IsSecondaryFromMaterial() || mcPart->IsSecondaryFromWeakDecay() || is_signal;
-        tMC_IsSignal = is_signal;
-        tMC_ReactionID = tMC_IsSignal ? GetReactionID(mcIdx, ancestor_idx) : -1;
+        tMC_Generator = mcPart->GetGeneratorIndex();
+        tMC_IsPrimary = mcPart->IsPhysicalPrimary();
+        tMC_IsSecFromMat = mcPart->IsSecondaryFromMaterial();
+        tMC_IsSecFromWeak = mcPart->IsSecondaryFromWeakDecay();
+        tMC_ReactionID = tMC_Generator == 2 ? GetReactionID(mcIdx, ancestor_idx) : -1;
 
-        Bytes += fTree_MC->Fill();
+        fTree_MC->Fill();
     }  // end of loop over MC particles
-    AliInfoF("sizeof(%s/%s) = %lu bytes", fOutputDir->GetName(), fTree_Event->GetName(), Bytes);
 }
 
 /*
@@ -784,18 +774,6 @@ Int_t AliAnalysisTaskEsd2Tree::GetAncestor(Int_t mcIdx, Int_t generation) {
         return mcIdx;
     }
     return GetAncestor(motherIdx, generation + 1);
-}
-
-/*
- * Returns an index to the generator of the particle.
- * - 0 : HIJING
- * - 1 : Anti-Neutron Injector
- * - 2 : Anti-Sexaquark Injector
- */
-Short_t AliAnalysisTaskEsd2Tree::GetGenerator(Int_t mcIdx) {
-    TString generator_name;
-    fMC->GetCocktailGenerator(mcIdx, generator_name);
-    return 2 * generator_name.Contains("Anti-Sexaquark") + 1 * generator_name.Contains("Anti-Neutron");
 }
 
 /*
@@ -825,8 +803,6 @@ void AliAnalysisTaskEsd2Tree::FillTracks() {
     Int_t mcIdx;
     Double_t momentum[3];
     Double_t position[3];
-
-    ULong_t Bytes = 0;
 
     for (Int_t esdIdx = 0; esdIdx < fESD->GetNumberOfTracks(); esdIdx++) {
 
@@ -872,9 +848,8 @@ void AliAnalysisTaskEsd2Tree::FillTracks() {
         // tTrack_TPCSharedMap = track->GetTPCSharedMap();
         tTrack_Idx_True = fIsMC ? TMath::Abs(track->GetLabel()) : -1;
 
-        Bytes += fTree_Tracks->Fill();
+        fTree_Tracks->Fill();
     }  // end of loop over tracks
-    AliInfoF("sizeof(%s/%s) = %lu bytes", fOutputDir->GetName(), fTree_Event->GetName(), Bytes);
 }
 
 /*
@@ -1032,7 +1007,6 @@ void AliAnalysisTaskEsd2Tree::ClearSignalLogs() {
  * Assign the in-memory values to the tree branches.
  */
 void AliAnalysisTaskEsd2Tree::FillInjected() {
-    ULong_t Bytes = 0;
     for (Int_t i = 0; i < (Int_t)fMap_ReactionID[fEventNumber].size(); i++) {
         tInjected_ReactionID = fMap_ReactionID[fEventNumber][i];
         tInjected_Px = fMap_Sexaquark_Px[fEventNumber][i];
@@ -1041,7 +1015,6 @@ void AliAnalysisTaskEsd2Tree::FillInjected() {
         tInjected_Nucleon_Px = fMap_Nucleon_Px[fEventNumber][i];
         tInjected_Nucleon_Py = fMap_Nucleon_Py[fEventNumber][i];
         tInjected_Nucleon_Pz = fMap_Nucleon_Pz[fEventNumber][i];
-        Bytes += fTree_Injected->Fill();
+        fTree_Injected->Fill();
     }
-    AliInfoF("sizeof(%s/%s) = %lu bytes", fOutputDir->GetName(), fTree_Injected->GetName(), Bytes);
 }

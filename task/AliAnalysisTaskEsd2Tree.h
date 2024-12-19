@@ -115,7 +115,8 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
     TString fSignalSimSet;  //! signal simulations set (e.g. "A1.8", "H2.01")
     UInt_t fRunNumber;      //! run number
-    Float_t fDirNumber;     //! directory number
+    UInt_t fDirNumber;      //! directory number
+    UInt_t fDirNumberB;     //! component after-the-dot of data directories
     UInt_t fEventNumber;    //! event number
     Float_t fCentrality;    //! centrality percentile
 
