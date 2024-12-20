@@ -31,6 +31,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fSignalLog_NewBasename(""),
       /*  */
       fOutputList(nullptr),
+      fHist_Events_Bookkeeping(nullptr),
       fHist_Centrality(nullptr),
       fHist_CentralityINT7(nullptr),
       /*  */
@@ -168,6 +169,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fSignalLog_NewBasename(""),
       /*  */
       fOutputList(nullptr),
+      fHist_Events_Bookkeeping(nullptr),
       fHist_Centrality(nullptr),
       fHist_CentralityINT7(nullptr),
       /*  */
@@ -354,6 +356,9 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
     fOutputList = new TList();
     fOutputList->SetOwner(kTRUE);
 
+    fHist_Events_Bookkeeping = new TH1F("Events_Bookkeeping", ";;Counts", 10, 0., 10.);
+    fOutputList->Add(fHist_Events_Bookkeeping);
+
     fHist_Centrality = new TH1F("Centrality", ";Centrality;Counts", 11, 0., 110.);
     fOutputList->Add(fHist_Centrality);
 
@@ -536,41 +541,53 @@ void AliAnalysisTaskEsd2Tree::FinishTaskOutput() {
  */
 Bool_t AliAnalysisTaskEsd2Tree::PassesEventSelection() {
 
+    fHist_Events_Bookkeeping->Fill(0.);
+
+    /* First Check */
+
+    if (!fEventCuts.AcceptEvent(fESD)) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(1.);
+
     /* Reference: https://twiki.cern.ch/twiki/bin/viewauth/ALICE/AliDPGRunList18r1 */
 
     if (!fIsMC && (fRunNumber == 296749 || fRunNumber == 296750 || fRunNumber == 296849 || fRunNumber == 296890 || fRunNumber == 297029 ||
                    fRunNumber == 297194 || fRunNumber == 297219 || fRunNumber == 297481)) {
         fEventCuts.UseTimeRangeCut();
-        fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kAny);  // PENDING: remove kAny?
+        fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kINT7);
         if (!fEventCuts.AcceptEvent(fESD)) return kFALSE;
     }
+    fHist_Events_Bookkeeping->Fill(2.);
+
+    /* Pileup Events */
+
+    if (!fEventCuts.PassedCut(AliEventCuts::kPileUp)) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(3.);
+
+    /* TPC Pileup Events */
+
+    if (!fEventCuts.PassedCut(AliEventCuts::kTPCPileUp)) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(4.);
+
+    /* Important for data? */
+
+    if (!fIsMC && fESD->GetHeader()->GetEventType() != 7) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(5.);
 
     /* Trigger Selection */
 
-    Bool_t IsMB = kFALSE;
-    Bool_t IsHighMultV0 = kFALSE;
-    Bool_t IsHighMultSPD = kFALSE;
-    Bool_t IsCentral = kFALSE;
-    Bool_t IsSemiCentral = kFALSE;
+    Bool_t IsMB = (fInputHandler->IsEventSelected() & AliVEvent::kINT7);
+    Bool_t IsHighMultV0 = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0);
+    Bool_t IsHighMultSPD = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD);
+    Bool_t IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral);
+    Bool_t IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral);
 
-    if (fInputHandler->IsEventSelected() & AliVEvent::kINT7) IsMB = kTRUE;
-    if (fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) IsHighMultV0 = kTRUE;
-    if (fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD) IsHighMultSPD = kTRUE;
-    if (fInputHandler->IsEventSelected() & AliVEvent::kCentral) IsCentral = kTRUE;
-    if (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) IsSemiCentral = kTRUE;
-
-    if (!IsMB && !IsHighMultV0 && !IsHighMultSPD && !IsCentral && !IsSemiCentral) {
-        AliInfoF("Event Rejected -- %u %u %u %u", fInputHandler->IsEventSelected(), AliVEvent::kINT7, AliVEvent::kCentral,
-                 AliVEvent::kSemiCentral);  // DEBUG
-        return kFALSE;
-    }
-    AliInfoF("Event Selected -- %u %u %u %u", fInputHandler->IsEventSelected(), AliVEvent::kINT7, AliVEvent::kCentral,
-             AliVEvent::kSemiCentral);  // DEBUG
+    if (!IsMB && !IsHighMultV0 && !IsHighMultSPD && !IsCentral && !IsSemiCentral) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(6.);
 
     /* rec. PV z-vertex range */
 
-    if (TMath::Abs(fPrimaryVertex->GetZ()) > 12.) return kFALSE;  // PENDING: hardcoded? not a good idea
-    AliInfo("Event Passed z-vertex range on PV");                 // DEBUG
+    if (TMath::Abs(fPrimaryVertex->GetZ()) > 12.) return kFALSE;
+    fHist_Events_Bookkeeping->Fill(7.);
 
     return kTRUE;
 }

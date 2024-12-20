@@ -130,9 +130,10 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
     /** QA Histograms **/
 
-    TList* fOutputList;          //!
-    TH1F* fHist_Centrality;      //!
-    TH1F* fHist_CentralityINT7;  //!
+    TList* fOutputList;              //!
+    TH1F* fHist_Events_Bookkeeping;  //!
+    TH1F* fHist_Centrality;          //!
+    TH1F* fHist_CentralityINT7;      //!
 
     /** File and subdir **/
 
