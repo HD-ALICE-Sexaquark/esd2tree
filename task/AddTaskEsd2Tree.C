@@ -1,7 +1,7 @@
 #include "AliAnalysisManager.h"
 #include "AliAnalysisTaskEsd2Tree.h"
 
-AliAnalysisTaskEsd2Tree *AddTask_Esd2Tree(Bool_t IsMC = kTRUE, Bool_t IsSignalMC = kTRUE) {
+AliAnalysisTaskEsd2Tree *AddTaskEsd2Tree(Bool_t IsMC = kTRUE, Bool_t IsSignalMC = kTRUE) {
 
     AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
     if (!mgr) return nullptr;

@@ -28,7 +28,7 @@ mkdir -p ${ATTEMPT_DIR}
 
 cp AliAnalysisTaskEsd2Tree.cxx ${ATTEMPT_DIR}/
 cp AliAnalysisTaskEsd2Tree.h ${ATTEMPT_DIR}/
-cp AddTask_Esd2Tree.C ${ATTEMPT_DIR}/
+cp AddTaskEsd2Tree.C ${ATTEMPT_DIR}/
 cp runAnalysis.C ${ATTEMPT_DIR}/
 
 cd ${ATTEMPT_DIR}
@@ -50,7 +50,7 @@ echo ${ALIROOT_COMMAND}
 ${ALIROOT_COMMAND} 2>&1 | tee analysis.log
 
 rm -v AliAnalysisTaskEsd2Tree*
-rm -v AddTask_Esd2Tree.C
+rm -v AddTaskEsd2Tree.C
 rm -v runAnalysis.C
 
 cd ..

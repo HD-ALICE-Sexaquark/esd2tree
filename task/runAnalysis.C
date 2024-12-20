@@ -1,8 +1,9 @@
 #include <fstream>
 
+#include "Rtypes.h"
 #include "TChain.h"
 #include "TGrid.h"
-#include "TROOT.h"
+#include "TSystem.h"
 
 #include "AliAnalysisAlien.h"
 #include "AliAnalysisManager.h"
@@ -31,41 +32,40 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     /* Check for Input Errors */
 
     if (Mode != "local" && Mode != "grid" && Mode != "hybrid") {
-        std::cerr << "!! Error !! runAnalysis.C !! Invalid Mode " << Mode << " !!" << std::endl;
+        std::cerr << "!! ERROR !! runAnalysis.C !! Invalid Mode " << Mode << std::endl;
         return;
     }
 
     if (Mode == "local" || Mode == "hybrid") {
         if (InputPath == "") {
-            std::cerr << "!! Error !! runAnalysis.C !! InputPath cannot be empty when Mode == \"local\" or \"hybrid\" !!" << std::endl;
+            std::cerr << "!! ERROR !! runAnalysis.C !! InputPath cannot be empty when Mode == \"local\" or \"hybrid\"" << std::endl;
             return;
         }
         if (GridTestMode) {
-            std::cerr << "!! Error !! runAnalysis.C !! GridTestMode is only valid when Mode == \"grid\" !!" << std::endl;
+            std::cerr << "!! ERROR !! runAnalysis.C !! GridTestMode is only valid when Mode == \"grid\"" << std::endl;
             return;
         }
     }
 
     if (Mode == "grid") {
         if (InputPath != "")
-            std::cerr << "!! Warning !! runAnalysis.C !! InputPath is only valid when Mode == \"local\" or \"hybrid\", will be ignored !!"
-                      << std::endl;
+            std::cerr << "!! WARNING !! runAnalysis.C !! InputPath is only valid when Mode == \"local\" or \"hybrid\", will be ignored" << std::endl;
         if (ChooseNEvents)
-            std::cerr << "!! Warning !! runAnalysis.C !! ChooseNEvents is only valid when Mode == \"local\" or \"hybrid\", will be ignored !!"
+            std::cerr << "!! WARNING !! runAnalysis.C !! ChooseNEvents is only valid when Mode == \"local\" or \"hybrid\", will be ignored"
                       << std::endl;
     }
 
     if (IsMC && ProductionName != "LHC23l1a3" && ProductionName != "LHC23l1b3" && ProductionName != "LHC20e3a" && ProductionName != "LHC20j6a") {
-        std::cerr << "!! Error !! runAnalysis.C !! Make sure to put a valid ProductionName for simulations !!" << std::endl;
+        std::cerr << "!! ERROR !! runAnalysis.C !! Make sure to put a valid ProductionName for simulations" << std::endl;
         return;
     }
 
     if (!IsMC && ProductionName != "LHC15o" && ProductionName != "LHC18q" && ProductionName != "LHC18r") {
-        std::cerr << "!! Error !! runAnalysis.C !! Make sure to put a valid ProductionName for data !!" << std::endl;
+        std::cerr << "!! ERROR !! runAnalysis.C !! Make sure to put a valid ProductionName for data" << std::endl;
         return;
     }
 
-    std::cout << "!! runAnalysis.C !! Passed initial input checks !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed initial input checks" << std::endl;
 
     /* Determine Further Options */
 
@@ -95,14 +95,14 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     std::vector<Int_t> RunNumbersFromList;
     std::ifstream RunNumbersFile(RunNumbersList);
     if (!RunNumbersFile.is_open()) {
-        std::cerr << "!! Error !! runAnalysis.C !! Unable to open file " << RunNumbersList << " !!" << std::endl;
+        std::cerr << "!! ERROR !! runAnalysis.C !! Unable to open file " << RunNumbersList << std::endl;
         return;
     }
     Int_t SingleRN;
     while (RunNumbersFile >> SingleRN) RunNumbersFromList.push_back(SingleRN);
     RunNumbersFile.close();
 
-    std::cout << "!! runAnalysis.C !! Passed further options !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed further options" << std::endl;
 
     /* Start */
 
@@ -110,9 +110,9 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     gInterpreter->ProcessLine(".include $ALICE_ROOT/include");
     gInterpreter->ProcessLine(".include $ALICE_PHYSICS/include");
 
-    AliAnalysisManager *mgr = new AliAnalysisManager("AnalysisManager_Esd2Tree");
+    AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Tree");
 
-    std::cout << "!! runAnalysis.C !! Created AliAnalysisManager !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Created AliAnalysisManager" << std::endl;
 
     /* Grid Connection */
 
@@ -133,7 +133,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         alienHandler->SetTTL(3600);
         alienHandler->SetOutputToRunNo(kTRUE);
         alienHandler->SetDefaultOutputs(kFALSE);
-        alienHandler->SetOutputFiles("AnalysisResults.root");
+        alienHandler->SetOutputFiles("AnalysisResults.root SimpleTrees.root");
         alienHandler->SetKeepLogs(kTRUE);
         alienHandler->SetMergeViaJDL(kFALSE);
         // alienHandler->SetMaxMergeStages(1);
@@ -144,7 +144,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
 
         mgr->SetGridHandler(alienHandler);
 
-        std::cout << "!! runAnalysis.C !! Passed grid connection !!" << std::endl;
+        std::cout << "!! INFO !! runAnalysis.C !! Passed grid connection" << std::endl;
     }
 
     TGrid *grid_connection = nullptr;
@@ -169,7 +169,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         mgr->SetMCtruthEventHandler(mcH);
     }
 
-    std::cout << "!! runAnalysis.C !! Passed creation of input handlers !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed creation of input handlers" << std::endl;
 
     /* Add Helper Tasks */
 
@@ -189,25 +189,25 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
     if (!TaskPIDResponse) return;
 
-    std::cout << "!! runAnalysis.C !! Passed addition of helper tasks !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed addition of helper tasks" << std::endl;
 
-    /* Add Esd2Tree Task */
+    /* Add Main Task */
 
     gInterpreter->LoadMacro("AliAnalysisTaskEsd2Tree.cxx++g");
 
     TString TaskEsd2Tree_Options = TString::Format("(%i, %i)", (Int_t)IsMC, (Int_t)IsSignalMC);
     AliAnalysisTaskEsd2Tree *TaskEsd2Tree =
-        reinterpret_cast<AliAnalysisTaskEsd2Tree *>(gInterpreter->ExecuteMacro("AddTask_Esd2Tree.C" + TaskEsd2Tree_Options));
+        reinterpret_cast<AliAnalysisTaskEsd2Tree *>(gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
     if (!TaskEsd2Tree) return;
 
-    std::cout << "!! runAnalysis.C !! Passed addition of main task !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed addition of main task" << std::endl;
 
     /* Init Analysis Manager */
 
     mgr->SetDebugLevel(3);
     if (!mgr->InitAnalysis()) return;
 
-    std::cout << "!! runAnalysis.C !! Passed InitAnalysis !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed InitAnalysis" << std::endl;
 
     /* Start Analysis */
 
@@ -249,8 +249,8 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         if (!ChooseNEvents)
             mgr->StartAnalysis("local", chain);  // read all events
         else
-            mgr->StartAnalysis("local", chain, ChooseNEvents);  // read first NEvents
+            mgr->StartAnalysis("local", chain, (Long64_t)ChooseNEvents);  // read first NEvents
     }
 
-    std::cout << "!! runAnalysis.C !! Passed StartAnalysis !!" << std::endl;
+    std::cout << "!! INFO !! runAnalysis.C !! Passed StartAnalysis" << std::endl;
 }
