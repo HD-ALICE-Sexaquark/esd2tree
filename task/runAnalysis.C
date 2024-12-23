@@ -215,7 +215,6 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     TString Prefix = "";
     if (Mode == "hybrid") Prefix = "alien://";
     TString FilePath = "";
-    TString DirString = "";
 
     if (Mode == "grid") {
         if (GridTestMode) {
@@ -235,14 +234,24 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
                     chain->AddFile(FilePath);
                 }
             } else {  // !IsMC (data)
-                for (Int_t DN = 1; DN <= 99; DN++) {
-                    for (Int_t sDN = 100; sDN <= 5000; sDN++) {
-                        DirString = TString::Format("%s000%i%03i.%i", TString(ProductionName(3, 2)).Data(), RN, DN, sDN);
-                        FilePath =
-                            TString::Format("%s%s/000%i/pass%i/%s/AliESDs.root", Prefix.Data(), DataPath.Data(), RN, PassNumber, DirString.Data());
-                        if (gSystem->AccessPathName(FilePath)) continue;
-                        chain->AddFile(FilePath);
-                    }
+                TString Path_DirNumbersFile = TString::Format("/tmp/DN_%s_%i.txt", ProductionName.Data(), RN);
+                TString ListCommand =
+                    TString::Format("alien.py ls %s/000%i/pass%i > %s", DataPath.Data(), RN, PassNumber, Path_DirNumbersFile.Data());
+                gSystem->Exec(ListCommand);
+                std::ifstream DirNumbersFile(Path_DirNumbersFile);
+                if (!DirNumbersFile.is_open()) {
+                    std::cerr << "!! ERROR !! runAnalysis.C !! Unable to open file " << Path_DirNumbersFile << std::endl;
+                    return;
+                }
+                std::string Line;
+                TString RootLine;
+                while (DirNumbersFile >> Line) {
+                    RootLine = TString(Line);
+                    if (!RootLine.BeginsWith(TString(ProductionName(3, 2)))) continue;
+                    FilePath = TString::Format("%s%s/000%i/pass%i/%sAliESDs.root", Prefix.Data(), DataPath.Data(), RN, PassNumber, RootLine.Data());
+                    std::cout << "!! INFO !! runAnalysis.C !! Adding file " << FilePath << std::endl;
+                    chain->AddFile(FilePath);
+                    // if (gSystem->AccessPathName(FilePath)) continue;
                 }
             }
         }
