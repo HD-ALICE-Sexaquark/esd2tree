@@ -19,3 +19,10 @@
 **.out
 **/attempts/
 **/slurm_logs/
+**/set_paths.sh
+**/doc/dir_numbers/
+**/task/exec.sh
+**/scripts/seff_all.sh
+**/RUN3
+**/sexaquark
+**/ilya
