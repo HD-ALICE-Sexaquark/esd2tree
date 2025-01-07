@@ -18,7 +18,10 @@
 
 void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
                  TString InputPath,       // (only valid when Mode == "local" or Mode == "hybrid") dir that contains ProductionName dirs
-                 Int_t LocalNDirs,        // (only valid when Mode == "local" or Mode == "hybrid") number of subdirs per run
+                 Int_t LocalNDirs,        // (only valid when Mode == "local" or Mode == "hybrid")
+                                          // for MC: number of subdirs per run
+                                          // for data: line number of `doc/dir_numbers/DN_<ProductionName>_<RunNumber>.txt` file
+                                          //           that contains the dir numbers
                  Bool_t GridTestMode,     // (only valid when Mode == "grid")
                  Bool_t IsMC,             // kTRUE for MC, kFALSE for data
                  TString ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
@@ -86,8 +89,8 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
     TString GridDataPattern = TString::Format("/pass%i/*/AliESDs.root", PassNumber);
     if (IsMC) GridDataPattern = "/*/AliESDs.root";
 
-    TString GridWorkingDir = TString::Format("work/Esd2Tree_Data_%s", ProductionName.Data());
-    if (IsMC) GridWorkingDir = TString::Format("work/Esd2Tree_MC_%s", ProductionName.Data());
+    TString GridWorkingDir = TString::Format("work/Esd2Tree/Data_%s", ProductionName.Data());
+    if (IsMC) GridWorkingDir = TString::Format("work/Esd2Tree/MC_%s", ProductionName.Data());
     if (IsSignalMC) GridWorkingDir += TString::Format("_%s", SimulationSet.Data());
 
     TString GridOutputDir = "output";
@@ -221,7 +224,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
             alienHandler->SetNtestFiles(5);  // hardcoded
             alienHandler->SetRunMode("test");
         } else {
-            alienHandler->SetSplitMaxInputFileNumber(35);  // hardcoded
+            alienHandler->SetSplitMaxInputFileNumber(60);  // hardcoded
             alienHandler->SetRunMode("full");
         }
         mgr->StartAnalysis("grid");
@@ -234,24 +237,26 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
                     chain->AddFile(FilePath);
                 }
             } else {  // !IsMC (data)
-                TString Path_DirNumbersFile = TString::Format("/tmp/DN_%s_%i.txt", ProductionName.Data(), RN);
-                TString ListCommand =
-                    TString::Format("alien.py ls %s/000%i/pass%i > %s", DataPath.Data(), RN, PassNumber, Path_DirNumbersFile.Data());
-                gSystem->Exec(ListCommand);
+                TString Path_DirNumbersFile =
+                    (TString)gSystem->ExpandPathName(TString::Format("${ANALYSIS_DIR}/doc/dir_numbers/DN_%s_%i.txt", ProductionName.Data(), RN));
                 std::ifstream DirNumbersFile(Path_DirNumbersFile);
                 if (!DirNumbersFile.is_open()) {
                     std::cerr << "!! ERROR !! runAnalysis.C !! Unable to open file " << Path_DirNumbersFile << std::endl;
                     return;
                 }
-                std::string Line;
-                TString RootLine;
-                while (DirNumbersFile >> Line) {
-                    RootLine = TString(Line);
-                    if (!RootLine.BeginsWith(TString(ProductionName(3, 2)))) continue;
-                    FilePath = TString::Format("%s%s/000%i/pass%i/%sAliESDs.root", Prefix.Data(), DataPath.Data(), RN, PassNumber, RootLine.Data());
+                // read line `LocalNDirs` from file
+                std::string CStr_Line;
+                TString TStr_Line;
+                for (Int_t line_number = 0; line_number < LocalNDirs; line_number++) std::getline(DirNumbersFile, CStr_Line);
+                TStr_Line = (TString)CStr_Line;
+                TObjArray *Tokens = TStr_Line.Tokenize(" ");
+                for (Int_t DN_i = 0; DN_i < Tokens->GetEntries(); DN_i++) {
+                    TString Str_DN = ((TObjString *)Tokens->At(DN_i))->GetString();
+                    FilePath =
+                        TString::Format("%s%s/000%i/pass%i/%s000%i%s/AliESDs.root",  //
+                                        Prefix.Data(), DataPath.Data(), RN, PassNumber, ((TString)ProductionName(3, 2)).Data(), RN, Str_DN.Data());
                     std::cout << "!! INFO !! runAnalysis.C !! Adding file " << FilePath << std::endl;
                     chain->AddFile(FilePath);
-                    // if (gSystem->AccessPathName(FilePath)) continue;
                 }
             }
         }
