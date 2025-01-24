@@ -17,7 +17,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fPrimaryVertex(nullptr),
       fPIDResponse(nullptr),
       fEventCuts(),
-      fMagneticField(0.),
       /*  */
       fSignalSimSet(""),
       fRunNumber(0),
@@ -25,6 +24,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fDirNumberB(0),
       fEventNumber(0),
       fCentrality(0.),
+      fMagneticField(0.),
       /*  */
       fAliEnPath(""),
       fReactionChannel(""),
@@ -52,6 +52,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tEvent_PV_RecYv(0.),
       tEvent_PV_RecZv(0.),
       tEvent_PV_NContributors(0),
+      tEvent_PV_CovMatrix(),
       tEvent_PV_ZvErr_FromSPD(0.),
       tEvent_PV_ZvErr_FromTracks(0.),
       tEvent_PV_Zv_FromSPD(0.),
@@ -155,7 +156,6 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fPrimaryVertex(nullptr),
       fPIDResponse(nullptr),
       fEventCuts(),
-      fMagneticField(0.),
       /*  */
       fSignalSimSet(""),
       fRunNumber(0),
@@ -163,6 +163,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fDirNumberB(0),
       fEventNumber(0),
       fCentrality(0.),
+      fMagneticField(0.),
       /*  */
       fAliEnPath(""),
       fReactionChannel(""),
@@ -190,6 +191,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tEvent_PV_RecYv(0.),
       tEvent_PV_RecZv(0.),
       tEvent_PV_NContributors(0),
+      tEvent_PV_CovMatrix(),
       tEvent_PV_ZvErr_FromSPD(0.),
       tEvent_PV_ZvErr_FromTracks(0.),
       tEvent_PV_Zv_FromSPD(0.),
@@ -409,10 +411,10 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
     } else {
         /* path of data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root` */
         TString aux_dir_nr = ((TObjString*)tokens->At(tokens->GetEntries() - 2))->GetString();
-        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 8));  // = "039.914"
+        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 10));  // = "039.914"
         AliInfoF("Dir Number : %s", aux_dir_nr.Data());
         fDirNumber = TString(aux_dir_nr(0, 3)).Atoi();   // = 39
-        fDirNumberB = TString(aux_dir_nr(4, 4)).Atoi();  // = 914
+        fDirNumberB = TString(aux_dir_nr(4, 5)).Atoi();  // = 914
     }
 
     return kTRUE;
@@ -459,7 +461,7 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
         EventUniqueID = TString::Format("DATA_%6u_%03u_%u_%03u", fRunNumber, fDirNumber, fDirNumberB, fEventNumber);
     }
 
-    AliInfoF("Initializing event %s", EventUniqueID.Data());
+    AliInfoF("Initializing event %u, TDirectory \"%s\"", fEventNumber, EventUniqueID.Data());
 
     // inside TDirectory
     fOutputDir = fOutputFile->mkdir(EventUniqueID);
@@ -615,6 +617,7 @@ void AliAnalysisTaskEsd2Tree::FillEvent() {
 
     Double_t PV_CovMatrix[6];
     fPrimaryVertex->GetCovarianceMatrix(PV_CovMatrix);
+    for (Int_t i = 0; i < 6; i++) tEvent_PV_CovMatrix[i] = (Float_t)PV_CovMatrix[i];
     tEvent_PV_ZvErr_FromTracks = (Float_t)PV_CovMatrix[5];
 
     tEvent_PV_Zv_FromSPD = (Float_t)PrimaryVertex_SPD->GetZ();
@@ -644,6 +647,7 @@ void AliAnalysisTaskEsd2Tree::AssociateEventsBranches() {
     if (!fIsMC) fTree_Events->Branch("DirNumberB", &fDirNumberB, "DirNumberB/i");
     fTree_Events->Branch("EventNumber", &fEventNumber, "EventNumber/i");
     fTree_Events->Branch("Centrality", &fCentrality, "Centrality/F");
+    fTree_Events->Branch("MagneticField", &fMagneticField, "MagneticField/F");
     fTree_Events->Branch("PV_TrueXv", &tEvent_PV_TrueXv, "PV_TrueXv/F");
     fTree_Events->Branch("PV_TrueYv", &tEvent_PV_TrueYv, "PV_TrueYv/F");
     fTree_Events->Branch("PV_TrueZv", &tEvent_PV_TrueZv, "PV_TrueZv/F");
@@ -653,6 +657,7 @@ void AliAnalysisTaskEsd2Tree::AssociateEventsBranches() {
     fTree_Events->Branch("PV_RecYv", &tEvent_PV_RecYv, "PV_RecYv/F");
     fTree_Events->Branch("PV_RecZv", &tEvent_PV_RecZv, "PV_RecZv/F");
     fTree_Events->Branch("PV_NContributors", &tEvent_PV_NContributors, "PV_NContributors/I");
+    fTree_Events->Branch("PV_CovMatrix", &tEvent_PV_CovMatrix, "PV_CovMatrix[6]/F");
     fTree_Events->Branch("PV_ZvErr_FromSPD", &tEvent_PV_ZvErr_FromSPD, "PV_ZvErr_FromSPD/F");
     fTree_Events->Branch("PV_ZvErr_FromTracks", &tEvent_PV_ZvErr_FromTracks, "PV_ZvErr_FromTracks/F");
     fTree_Events->Branch("PV_Zv_FromSPD", &tEvent_PV_Zv_FromSPD, "PV_Zv_FromSPD/F");
@@ -714,7 +719,7 @@ void AliAnalysisTaskEsd2Tree::AssociateTracksBranches() {
     fTree_Tracks->Branch("X", &tTrack_X, "X/F");
     fTree_Tracks->Branch("Y", &tTrack_Y, "Y/F");
     fTree_Tracks->Branch("Z", &tTrack_Z, "Z/F");
-    fTree_Tracks->Branch("Charge", &tTrack_Charge, "Charge/I");
+    fTree_Tracks->Branch("Charge", &tTrack_Charge, "Charge/S");
     fTree_Tracks->Branch("Alpha", &tTrack_Alpha, "Alpha/F");
     fTree_Tracks->Branch("Snp", &tTrack_Snp, "Snp/F");
     fTree_Tracks->Branch("Tgl", &tTrack_Tgl, "Tgl/F");
@@ -725,10 +730,10 @@ void AliAnalysisTaskEsd2Tree::AssociateTracksBranches() {
     fTree_Tracks->Branch("NSigmaProton", &tTrack_NSigmaProton, "NSigmaProton/F");
     fTree_Tracks->Branch("DCAxy", &tTrack_DCAxy, "DCAxy/F");
     fTree_Tracks->Branch("DCAz", &tTrack_DCAz, "DCAz/F");
-    fTree_Tracks->Branch("NTPCClusters", &tTrack_NTPCClusters, "NTPCClusters/I");
-    fTree_Tracks->Branch("NCrossedRows", &tTrack_NCrossedRows, "NCrossedRows/I");
-    fTree_Tracks->Branch("NFindableClusters", &tTrack_NFindableClusters, "NFindableClusters/I");
-    fTree_Tracks->Branch("NSharedClusters", &tTrack_NSharedClusters, "NSharedClusters/I");
+    fTree_Tracks->Branch("NTPCClusters", &tTrack_NTPCClusters, "NTPCClusters/s");
+    fTree_Tracks->Branch("NCrossedRows", &tTrack_NCrossedRows, "NCrossedRows/F");
+    fTree_Tracks->Branch("NFindableClusters", &tTrack_NFindableClusters, "NFindableClusters/s");
+    fTree_Tracks->Branch("NSharedClusters", &tTrack_NSharedClusters, "NSharedClusters/s");
     fTree_Tracks->Branch("Chi2overNcls", &tTrack_Chi2overNcls, "Chi2overNcls/F");
     fTree_Tracks->Branch("IsKinkDaughter", &tTrack_IsKinkDaughter, "IsKinkDaughter/O");
     // fTree_Tracks->Branch("TPCFitMap", &tTrack_TPCFitMap);

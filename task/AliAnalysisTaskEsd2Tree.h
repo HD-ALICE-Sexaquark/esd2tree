@@ -111,14 +111,14 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliESDVertex* fPrimaryVertex;   //! primary vertex
     AliPIDResponse* fPIDResponse;   //! pid response object
     AliEventCuts fEventCuts;        //! event cuts
-    Double_t fMagneticField;        //! magnetic field
 
-    TString fSignalSimSet;  //! signal simulations set (e.g. "A1.8", "H2.01")
-    UInt_t fRunNumber;      //! run number
-    UInt_t fDirNumber;      //! directory number
-    UInt_t fDirNumberB;     //! component after-the-dot of data directories
-    UInt_t fEventNumber;    //! event number
-    Float_t fCentrality;    //! centrality percentile
+    TString fSignalSimSet;   //! signal simulations set (e.g. "A1.8", "H2.01")
+    UInt_t fRunNumber;       //! run number
+    UInt_t fDirNumber;       //! directory number
+    UInt_t fDirNumberB;      //! component after-the-dot of data directories
+    UInt_t fEventNumber;     //! event number
+    Float_t fCentrality;     //! centrality percentile
+    Float_t fMagneticField;  //! magnetic field
 
     /* Signal Logs */
 
@@ -156,6 +156,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t tEvent_PV_RecYv;             //!
     Float_t tEvent_PV_RecZv;             //!
     Int_t tEvent_PV_NContributors;       //!
+    Float_t tEvent_PV_CovMatrix[6];      //!
     Float_t tEvent_PV_ZvErr_FromSPD;     //!
     Float_t tEvent_PV_ZvErr_FromTracks;  //!
     Float_t tEvent_PV_Zv_FromSPD;        //!
