@@ -6,7 +6,7 @@ if [[ -z ${ANALYSIS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. 
 
 export ATTEMPT_NAME="grid_bkgMC_15o_full"
 export MODE="grid"
-export LOCAL_INPUT_PATH=""
+export INPUT_PATH=""
 export LOCAL_N_DIRS=0
 export GRID_TEST_MODE=0
 export IS_MC=1

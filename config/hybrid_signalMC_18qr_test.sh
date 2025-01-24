@@ -7,7 +7,7 @@ if [[ -z ${ANALYSIS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. 
 
 export ATTEMPT_NAME="hybrid_signalMC_${SIMULATION_SET}_18qr_test"
 export MODE="hybrid"
-export LOCAL_INPUT_PATH="/alice/sim/2023"
+export INPUT_PATH="/alice/sim/2023"
 export LOCAL_N_DIRS=110
 export GRID_TEST_MODE=0
 export IS_MC=1

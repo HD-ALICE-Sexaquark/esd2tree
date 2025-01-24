@@ -2,12 +2,12 @@
 
 # IMPORTANT: this file should always be sourced by another script
 
-if [[ -z ${DATA_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. DATA_DIR" ; exit 1; fi
+if [[ -z ${LOCAL_DATA_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. LOCAL_DATA_DIR" ; exit 1; fi
 if [[ -z ${ANALYSIS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. ANALYSIS_DIR" ; exit 1; fi
 
 export ATTEMPT_NAME="local_data_18r_test"
 export MODE="local"
-export LOCAL_INPUT_PATH="${DATA_DIR}/2018"
+export INPUT_PATH="${LOCAL_DATA_DIR}/2018"
 export LOCAL_N_DIRS=6
 export GRID_TEST_MODE=0
 export IS_MC=0

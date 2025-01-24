@@ -2,12 +2,12 @@
 
 # IMPORTANT: this file should always be sourced by another script
 
-if [[ -z ${SIMS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. SIMS_DIR" ; exit 1; fi
+if [[ -z ${LOCAL_SIMS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. LOCAL_SIMS_DIR" ; exit 1; fi
 if [[ -z ${ANALYSIS_DIR} ]]; then echo "ERROR :: config_file.sh :: Missing env. var. ANALYSIS_DIR" ; exit 1; fi
 
 export ATTEMPT_NAME="local_bkgMC_18qr_test"
 export MODE="local"
-export LOCAL_INPUT_PATH="${SIMS_DIR}"
+export INPUT_PATH="${LOCAL_SIMS_DIR}"
 export LOCAL_N_DIRS=20
 export GRID_TEST_MODE=0
 export IS_MC=1
