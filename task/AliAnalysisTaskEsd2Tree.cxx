@@ -48,16 +48,14 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tEvent_PV_TrueZv(0.),
       tEvent_IsGenPileup(kFALSE),
       tEvent_IsSBCPileup(kFALSE),
-      tEvent_PV_RecXv(0.),
-      tEvent_PV_RecYv(0.),
-      tEvent_PV_RecZv(0.),
       tEvent_PV_NContributors(0),
-      tEvent_PV_CovMatrix(),
-      tEvent_PV_ZvErr_FromSPD(0.),
-      tEvent_PV_ZvErr_FromTracks(0.),
-      tEvent_PV_Zv_FromSPD(0.),
-      tEvent_PV_Zv_FromTracks(0.),
       tEvent_PV_Dispersion(0.),
+      tEvent_PV_Xv(0.),
+      tEvent_PV_Yv(0.),
+      tEvent_PV_Zv(0.),
+      tEvent_PV_CovMatrix(),
+      tEvent_SPD_PV_Zv(0.),
+      tEvent_SPD_PV_ZvErr(0.),
       tEvent_NTracks(0),
       tEvent_NTPCClusters(0),
       tEvent_IsMB(kFALSE),
@@ -187,16 +185,14 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tEvent_PV_TrueZv(0.),
       tEvent_IsGenPileup(kFALSE),
       tEvent_IsSBCPileup(kFALSE),
-      tEvent_PV_RecXv(0.),
-      tEvent_PV_RecYv(0.),
-      tEvent_PV_RecZv(0.),
       tEvent_PV_NContributors(0),
-      tEvent_PV_CovMatrix(),
-      tEvent_PV_ZvErr_FromSPD(0.),
-      tEvent_PV_ZvErr_FromTracks(0.),
-      tEvent_PV_Zv_FromSPD(0.),
-      tEvent_PV_Zv_FromTracks(0.),
       tEvent_PV_Dispersion(0.),
+      tEvent_PV_Xv(0.),
+      tEvent_PV_Yv(0.),
+      tEvent_PV_Zv(0.),
+      tEvent_PV_CovMatrix(),
+      tEvent_SPD_PV_Zv(0.),
+      tEvent_SPD_PV_ZvErr(0.),
       tEvent_NTracks(0),
       tEvent_NTPCClusters(0),
       tEvent_IsMB(kFALSE),
@@ -449,7 +445,7 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
 
     if (!PassesEventSelection()) return;
 
-    /* Initialize event's unique identifier */
+    /* Set event's unique identifier (UID) */
 
     TString EventUniqueID;
     if (fIsMC) {
@@ -605,24 +601,22 @@ void AliAnalysisTaskEsd2Tree::FillEvent() {
         tEvent_IsGenPileup = AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing");
         tEvent_IsSBCPileup = AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing");
     }
-    tEvent_PV_RecXv = (Float_t)fPrimaryVertex->GetX();
-    tEvent_PV_RecYv = (Float_t)fPrimaryVertex->GetY();
-    tEvent_PV_RecZv = (Float_t)fPrimaryVertex->GetZ();
+
     tEvent_PV_NContributors = fPrimaryVertex->GetNContributors();
-
-    AliESDVertex* PrimaryVertex_SPD = const_cast<AliESDVertex*>(fESD->GetPrimaryVertexSPD());
-    Double_t PV_SPD_CovMatrix[6];
-    PrimaryVertex_SPD->GetCovarianceMatrix(PV_SPD_CovMatrix);
-    tEvent_PV_ZvErr_FromSPD = (Float_t)PV_SPD_CovMatrix[5];
-
+    tEvent_PV_Dispersion = (Float_t)fPrimaryVertex->GetDispersion();
+    tEvent_PV_Xv = (Float_t)fPrimaryVertex->GetX();
+    tEvent_PV_Yv = (Float_t)fPrimaryVertex->GetY();
+    tEvent_PV_Zv = (Float_t)fPrimaryVertex->GetZ();
     Double_t PV_CovMatrix[6];
     fPrimaryVertex->GetCovarianceMatrix(PV_CovMatrix);
     for (Int_t i = 0; i < 6; i++) tEvent_PV_CovMatrix[i] = (Float_t)PV_CovMatrix[i];
-    tEvent_PV_ZvErr_FromTracks = (Float_t)PV_CovMatrix[5];
 
-    tEvent_PV_Zv_FromSPD = (Float_t)PrimaryVertex_SPD->GetZ();
-    tEvent_PV_Zv_FromTracks = (Float_t)fPrimaryVertex->GetZ();
-    tEvent_PV_Dispersion = (Float_t)fPrimaryVertex->GetDispersion();
+    const AliESDVertex* PrimaryVertex_SPD = (AliESDVertex*)fESD->GetPrimaryVertexSPD();
+    tEvent_SPD_PV_Zv = (Float_t)PrimaryVertex_SPD->GetZ();
+    Double_t PV_SPD_CovMatrix[6];
+    PrimaryVertex_SPD->GetCovarianceMatrix(PV_SPD_CovMatrix);
+    tEvent_SPD_PV_ZvErr = (Float_t)PV_SPD_CovMatrix[5];
+
     tEvent_NTracks = (UInt_t)fESD->GetNumberOfTracks();
     tEvent_NTPCClusters = fESD->GetNumberOfTPCClusters();
     tEvent_IsMB = fInputHandler->IsEventSelected() & AliVEvent::kINT7;
@@ -648,21 +642,21 @@ void AliAnalysisTaskEsd2Tree::AssociateEventsBranches() {
     fTree_Events->Branch("EventNumber", &fEventNumber, "EventNumber/i");
     fTree_Events->Branch("Centrality", &fCentrality, "Centrality/F");
     fTree_Events->Branch("MagneticField", &fMagneticField, "MagneticField/F");
-    fTree_Events->Branch("PV_TrueXv", &tEvent_PV_TrueXv, "PV_TrueXv/F");
-    fTree_Events->Branch("PV_TrueYv", &tEvent_PV_TrueYv, "PV_TrueYv/F");
-    fTree_Events->Branch("PV_TrueZv", &tEvent_PV_TrueZv, "PV_TrueZv/F");
-    fTree_Events->Branch("IsGenPileup", &tEvent_IsGenPileup, "IsGenPileup/O");
-    fTree_Events->Branch("IsSBCPileup", &tEvent_IsSBCPileup, "IsSBCPileup/O");
-    fTree_Events->Branch("PV_RecXv", &tEvent_PV_RecXv, "PV_RecXv/F");
-    fTree_Events->Branch("PV_RecYv", &tEvent_PV_RecYv, "PV_RecYv/F");
-    fTree_Events->Branch("PV_RecZv", &tEvent_PV_RecZv, "PV_RecZv/F");
+    if (fIsMC) {
+        fTree_Events->Branch("PV_TrueXv", &tEvent_PV_TrueXv, "PV_TrueXv/F");
+        fTree_Events->Branch("PV_TrueYv", &tEvent_PV_TrueYv, "PV_TrueYv/F");
+        fTree_Events->Branch("PV_TrueZv", &tEvent_PV_TrueZv, "PV_TrueZv/F");
+        fTree_Events->Branch("IsGenPileup", &tEvent_IsGenPileup, "IsGenPileup/O");
+        fTree_Events->Branch("IsSBCPileup", &tEvent_IsSBCPileup, "IsSBCPileup/O");
+    }
     fTree_Events->Branch("PV_NContributors", &tEvent_PV_NContributors, "PV_NContributors/I");
-    fTree_Events->Branch("PV_CovMatrix", &tEvent_PV_CovMatrix, "PV_CovMatrix[6]/F");
-    fTree_Events->Branch("PV_ZvErr_FromSPD", &tEvent_PV_ZvErr_FromSPD, "PV_ZvErr_FromSPD/F");
-    fTree_Events->Branch("PV_ZvErr_FromTracks", &tEvent_PV_ZvErr_FromTracks, "PV_ZvErr_FromTracks/F");
-    fTree_Events->Branch("PV_Zv_FromSPD", &tEvent_PV_Zv_FromSPD, "PV_Zv_FromSPD/F");
-    fTree_Events->Branch("PV_Zv_FromTracks", &tEvent_PV_Zv_FromTracks, "PV_Zv_FromTracks/F");
     fTree_Events->Branch("PV_Dispersion", &tEvent_PV_Dispersion, "PV_Dispersion/F");
+    fTree_Events->Branch("PV_Xv", &tEvent_PV_Xv, "PV_Xv/F");
+    fTree_Events->Branch("PV_Yv", &tEvent_PV_Yv, "PV_Yv/F");
+    fTree_Events->Branch("PV_Zv", &tEvent_PV_Zv, "PV_Zv/F");
+    fTree_Events->Branch("PV_CovMatrix", &tEvent_PV_CovMatrix, "PV_CovMatrix[6]/F");
+    fTree_Events->Branch("SPD_PV_Zv", &tEvent_SPD_PV_Zv, "PV_Zv/F");
+    fTree_Events->Branch("SPD_PV_ZvErr", &tEvent_SPD_PV_ZvErr, "PV_ZvErr/F");
     fTree_Events->Branch("NTracks", &tEvent_NTracks, "NTracks/i");
     fTree_Events->Branch("NTPCClusters", &tEvent_NTPCClusters, "NTPCClusters/I");
     fTree_Events->Branch("IsMB", &tEvent_IsMB, "IsMB/O");
@@ -739,7 +733,7 @@ void AliAnalysisTaskEsd2Tree::AssociateTracksBranches() {
     // fTree_Tracks->Branch("TPCFitMap", &tTrack_TPCFitMap);
     // fTree_Tracks->Branch("TPCClusterMap", &tTrack_TPCClusterMap);
     // fTree_Tracks->Branch("TPCSharedMap", &tTrack_TPCSharedMap);
-    fTree_Tracks->Branch("Idx_True", &tTrack_Idx_True, "Idx_True/I");
+    if (fIsMC) fTree_Tracks->Branch("Idx_True", &tTrack_Idx_True, "Idx_True/I");
 }
 
 /*                  */
@@ -868,7 +862,7 @@ void AliAnalysisTaskEsd2Tree::FillTracks() {
         // tTrack_TPCFitMap = track->GetTPCFitMap();
         // tTrack_TPCClusterMap = track->GetTPCClusterMap();
         // tTrack_TPCSharedMap = track->GetTPCSharedMap();
-        tTrack_Idx_True = fIsMC ? TMath::Abs(track->GetLabel()) : -1;
+        if (fIsMC) tTrack_Idx_True = TMath::Abs(track->GetLabel());
 
         fTree_Tracks->Fill();
     }  // end of loop over tracks

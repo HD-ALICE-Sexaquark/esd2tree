@@ -147,28 +147,26 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     TTree* fTree_MC;        //!
     TTree* fTree_Tracks;    //!
 
-    Float_t tEvent_PV_TrueXv;            //!
-    Float_t tEvent_PV_TrueYv;            //!
-    Float_t tEvent_PV_TrueZv;            //!
-    Bool_t tEvent_IsGenPileup;           //!
-    Bool_t tEvent_IsSBCPileup;           //!
-    Float_t tEvent_PV_RecXv;             //!
-    Float_t tEvent_PV_RecYv;             //!
-    Float_t tEvent_PV_RecZv;             //!
-    Int_t tEvent_PV_NContributors;       //!
-    Float_t tEvent_PV_CovMatrix[6];      //!
-    Float_t tEvent_PV_ZvErr_FromSPD;     //!
-    Float_t tEvent_PV_ZvErr_FromTracks;  //!
-    Float_t tEvent_PV_Zv_FromSPD;        //!
-    Float_t tEvent_PV_Zv_FromTracks;     //!
-    Float_t tEvent_PV_Dispersion;        //!
-    UInt_t tEvent_NTracks;               //!
-    Int_t tEvent_NTPCClusters;           //!
-    Bool_t tEvent_IsMB;                  //!
-    Bool_t tEvent_IsHighMultV0;          //!
-    Bool_t tEvent_IsHighMultSPD;         //!
-    Bool_t tEvent_IsCentral;             //!
-    Bool_t tEvent_IsSemiCentral;         //!
+    Float_t tEvent_PV_TrueXv;        //!
+    Float_t tEvent_PV_TrueYv;        //!
+    Float_t tEvent_PV_TrueZv;        //!
+    Bool_t tEvent_IsGenPileup;       //!
+    Bool_t tEvent_IsSBCPileup;       //!
+    Int_t tEvent_PV_NContributors;   //!
+    Float_t tEvent_PV_Dispersion;    //!
+    Float_t tEvent_PV_Xv;            //!
+    Float_t tEvent_PV_Yv;            //!
+    Float_t tEvent_PV_Zv;            //!
+    Float_t tEvent_PV_CovMatrix[6];  //!
+    Float_t tEvent_SPD_PV_Zv;        //!
+    Float_t tEvent_SPD_PV_ZvErr;     //!
+    UInt_t tEvent_NTracks;           //!
+    Int_t tEvent_NTPCClusters;       //!
+    Bool_t tEvent_IsMB;              //!
+    Bool_t tEvent_IsHighMultV0;      //!
+    Bool_t tEvent_IsHighMultSPD;     //!
+    Bool_t tEvent_IsCentral;         //!
+    Bool_t tEvent_IsSemiCentral;     //!
 
     std::map<Int_t, std::vector<UInt_t>> fMap_ReactionID;     //!
     std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Px;  //!
