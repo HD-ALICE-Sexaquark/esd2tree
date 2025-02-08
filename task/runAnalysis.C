@@ -136,7 +136,7 @@ void runAnalysis(TString Mode,            // "local", "grid", "hybrid"
         alienHandler->SetTTL(3600);
         alienHandler->SetOutputToRunNo(kTRUE);
         alienHandler->SetDefaultOutputs(kFALSE);
-        alienHandler->SetOutputFiles("AnalysisResults.root SimpleTrees.root");
+        alienHandler->SetOutputFiles("AnalysisResults.root");
         alienHandler->SetKeepLogs(kTRUE);
         alienHandler->SetMergeViaJDL(kFALSE);
         // alienHandler->SetMaxMergeStages(1);

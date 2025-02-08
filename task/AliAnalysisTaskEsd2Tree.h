@@ -2,7 +2,8 @@
 #define ALIANALYSISTASKESD2TREE_H
 
 #include <fstream>
-#include <map>
+#include <unordered_map>
+#include <vector>
 
 #include "TArray.h"
 #include "TChain.h"
@@ -51,60 +52,57 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
    public:
     AliAnalysisTaskEsd2Tree();
     AliAnalysisTaskEsd2Tree(const char* name);
-    virtual ~AliAnalysisTaskEsd2Tree();
+    ~AliAnalysisTaskEsd2Tree();
 
     AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);
     AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
 
     /* Settings ~ stored in Analysis Manager */
-    void IsMC(Bool_t IsMC, Bool_t IsSignalMC = kFALSE) {
-        fIsMC = IsMC;
-        fIsSignalMC = IsSignalMC;
+    void IsMC(Bool_t is_mc, Bool_t is_signal_mc = kFALSE) {
+        fIsMC = is_mc;
+        fIsSignalMC = is_signal_mc;
     };
     void Initialize();
     void DefineTracksCuts(TString cuts_option);
 
     /* Main ~ executed at runtime */
-    virtual void UserCreateOutputObjects();
-    virtual Bool_t UserNotify();
-    virtual void UserExec(Option_t* option);
-    virtual void FinishTaskOutput();
-    virtual void Terminate(Option_t* option) { return; }
+    void UserCreateOutputObjects();
+    Bool_t UserNotify();
+    void UserExec(Option_t* option);
+    void Terminate(Option_t* option) { return; }
 
-    /* Trees */
+    /* Tree */
     void AssociateEventsBranches();
     void AssociateInjectedBranches();
     void AssociateMCBranches();
     void AssociateTracksBranches();
-    void WriteTree(TTree* thisTree);
 
     /* Events */
+    void ProcessEvent();
     Bool_t PassesEventSelection();
-    void FillEvent();
 
-    /* Signal Logs */
+    /* MC Particles */
+    void ProcessMCParticles();
+    void ClearMCBranches();
+
+    /* Tracks */
+    void ProcessTracks();
+    Bool_t PassesTrackSelection(AliESDtrack* track);
+    void ClearTracksBranches();
+
+    /* Injected Reactions */
+    void ProcessInjectedReactions();
     void BringSignalLogs();
     Bool_t LoadSignalLogs();
     void ClearSignalLogs();
-    void FillInjected();
-
-    /* MC Particles */
-    void FillMC();
-    Int_t GetAncestor(Int_t mcIdx, Int_t generation = 0);
-    Int_t GetReactionID(Int_t mcIdx, Int_t ancestorIdx);
-
-    /* Tracks */
-    void FillTracks();
-    Bool_t PassesTrackSelection(AliESDtrack* track);
+    void ClearInjectedBranches();
 
    private:
     /* Settings ~ stored in Analysis Manager ~ all persistent */
-
     Bool_t fIsMC;        // kTRUE if MC simulation, kFALSE if data
     Bool_t fIsSignalMC;  // kTRUE to read and load signal logs
 
     /* AliRoot Objects */
-
     AliMCEvent* fMC;                //! MC event
     AliVVertex* fMC_PrimaryVertex;  //! MC gen. (or true) primary vertex
     AliESDEvent* fESD;              //! reconstructed event
@@ -121,32 +119,31 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Float_t fMagneticField;  //! magnetic field
 
     /* Signal Logs */
-
     TString fAliEnPath;              //! loaded in `UserNotify()`
     TString fReactionChannel;        //! derived from `fAliEnPath` in `UserNotify()`
     TString fSignalLog_NewBasename;  //!
 
+    /* Utilities */
+    std::unordered_map<Int_t, Long_t> fMcEntry_;                      //! key: mc_idx
+    std::unordered_map<UInt_t, std::vector<UInt_t>> fReactionID_;     //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Px_;  //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Py_;  //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Pz_;  //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Px_;    //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Py_;    //! key: event_n
+    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Pz_;    //! key: event_n
+
     /* Output */
 
     /** QA Histograms **/
-
     TList* fOutputList;              //!
     TH1F* fHist_Events_Bookkeeping;  //!
     TH1F* fHist_Centrality;          //!
     TH1F* fHist_CentralityINT7;      //!
 
-    /** File and subdir **/
-
-    TFile* fOutputFile;      //! pointer to the output file
-    TDirectory* fOutputDir;  //! pointer to the output subdirectory
-
     /** Trees **/
-
-    TTree* fTree_Events;    //!
-    TTree* fTree_Injected;  //!
-    TTree* fTree_MC;        //!
-    TTree* fTree_Tracks;    //!
-
+    TTree* fOutputTree;  //!
+    /* -- Event properties */
     Float_t tEvent_PV_TrueXv;        //!
     Float_t tEvent_PV_TrueYv;        //!
     Float_t tEvent_PV_TrueZv;        //!
@@ -167,72 +164,73 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tEvent_IsHighMultSPD;     //!
     Bool_t tEvent_IsCentral;         //!
     Bool_t tEvent_IsSemiCentral;     //!
-
-    std::map<Int_t, std::vector<UInt_t>> fMap_ReactionID;     //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Px;  //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Py;  //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Sexaquark_Pz;  //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Px;    //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Py;    //!
-    std::map<Int_t, std::vector<Float_t>> fMap_Nucleon_Pz;    //!
-
-    UInt_t tInjected_ReactionID;   //!
-    Float_t tInjected_Px;          //!
-    Float_t tInjected_Py;          //!
-    Float_t tInjected_Pz;          //!
-    Float_t tInjected_Nucleon_Px;  //!
-    Float_t tInjected_Nucleon_Py;  //!
-    Float_t tInjected_Nucleon_Pz;  //!
-
-    UInt_t tMC_Idx;            //!
-    Int_t tMC_PdgCode;         //!
-    Int_t tMC_Idx_Mother;      //!
-    Int_t tMC_Idx_Ancestor;    //!
-    Float_t tMC_Px;            //!
-    Float_t tMC_Py;            //!
-    Float_t tMC_Pz;            //!
-    Float_t tMC_Xv;            //! origin x-vertex
-    Float_t tMC_Yv;            //! origin y-vertex
-    Float_t tMC_Zv;            //! origin z-vertex
-    UInt_t tMC_Status;         //!
-    Bool_t tMC_IsOOBPileup;    //!
-    Short_t tMC_Generator;     //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
-    Bool_t tMC_IsPrimary;      //!
-    Bool_t tMC_IsSecFromMat;   //!
-    Bool_t tMC_IsSecFromWeak;  //!
-    Int_t tMC_ReactionID;      //!
-
-    UInt_t tTrack_Idx;                  //!
-    Float_t tTrack_Px;                  //! inner parametrization
-    Float_t tTrack_Py;                  //! inner parametrization
-    Float_t tTrack_Pz;                  //! inner parametrization
-    Float_t tTrack_X;                   //!
-    Float_t tTrack_Y;                   //!
-    Float_t tTrack_Z;                   //!
-    Short_t tTrack_Charge;              //!
-    Float_t tTrack_Alpha;               //!
-    Float_t tTrack_Snp;                 //! local sine of the track momentum azimuthal angle
-    Float_t tTrack_Tgl;                 //! tangent of the track momentum dip angle
-    Float_t tTrack_Signed1Pt;           //! 1/pt
-    Float_t tTrack_CovMatrix[15];       //! covariance matrix
-    Float_t tTrack_NSigmaPion;          //!
-    Float_t tTrack_NSigmaKaon;          //!
-    Float_t tTrack_NSigmaProton;        //!
-    Float_t tTrack_DCAxy;               //! pre-calculated DCA wrt PV
-    Float_t tTrack_DCAz;                //! pre-calculated DCA wrt PV
-    UShort_t tTrack_NTPCClusters;       //!
-    Float_t tTrack_NCrossedRows;        //!
-    UShort_t tTrack_NFindableClusters;  //!
-    UShort_t tTrack_NSharedClusters;    //!
-    Float_t tTrack_Chi2overNcls;        //!
-    Bool_t tTrack_IsKinkDaughter;       //!
+    /* -- Signal reaction properties */
+    std::vector<UInt_t> tInjected_ReactionID;   //!
+    std::vector<Float_t> tInjected_Px;          //!
+    std::vector<Float_t> tInjected_Py;          //!
+    std::vector<Float_t> tInjected_Pz;          //!
+    std::vector<Float_t> tInjected_Nucleon_Px;  //!
+    std::vector<Float_t> tInjected_Nucleon_Py;  //!
+    std::vector<Float_t> tInjected_Nucleon_Pz;  //!
+    /* -- MC particles properties */
+    std::vector<Int_t> tMC_PdgCode;          //!
+    std::vector<Long_t> tMC_Mother_McEntry;  //!
+    std::vector<Float_t> tMC_Px;             //!
+    std::vector<Float_t> tMC_Py;             //!
+    std::vector<Float_t> tMC_Pz;             //!
+    std::vector<Float_t> tMC_Xv;             //! origin x-vertex
+    std::vector<Float_t> tMC_Yv;             //! origin y-vertex
+    std::vector<Float_t> tMC_Zv;             //! origin z-vertex
+    std::vector<UInt_t> tMC_Status;          //!
+    std::vector<Bool_t> tMC_IsOOBPileup;     //!
+    std::vector<Int_t> tMC_Generator;        //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
+    std::vector<Bool_t> tMC_IsPrimary;       //!
+    std::vector<Bool_t> tMC_IsSecFromMat;    //!
+    std::vector<Bool_t> tMC_IsSecFromWeak;   //!
+    /* -- Tracks properties */
+    std::vector<Float_t> tTrack_Px;                //! inner parametrization
+    std::vector<Float_t> tTrack_Py;                //! inner parametrization
+    std::vector<Float_t> tTrack_Pz;                //! inner parametrization
+    std::vector<Float_t> tTrack_X;                 //!
+    std::vector<Float_t> tTrack_Y;                 //!
+    std::vector<Float_t> tTrack_Z;                 //!
+    std::vector<Int_t> tTrack_Charge;              //!
+    std::vector<Float_t> tTrack_Alpha;             //!
+    std::vector<Float_t> tTrack_Snp;               //! local sine of the track momentum azimuthal angle
+    std::vector<Float_t> tTrack_Tgl;               //! tangent of the track momentum dip angle
+    std::vector<Float_t> tTrack_Signed1Pt;         //! 1/pt
+    std::vector<Float_t> tTrack_SigmaY2;           //! cov_matrix[0]
+    std::vector<Float_t> tTrack_SigmaZY;           //! cov_matrix[1]
+    std::vector<Float_t> tTrack_SigmaZ2;           //! cov_matrix[2]
+    std::vector<Float_t> tTrack_SigmaSnpY;         //! cov_matrix[3]
+    std::vector<Float_t> tTrack_SigmaSnpZ;         //! cov_matrix[4]
+    std::vector<Float_t> tTrack_SigmaSnp2;         //! cov_matrix[5]
+    std::vector<Float_t> tTrack_SigmaTglY;         //! cov_matrix[6]
+    std::vector<Float_t> tTrack_SigmaTglZ;         //! cov_matrix[7]
+    std::vector<Float_t> tTrack_SigmaTglSnp;       //! cov_matrix[8]
+    std::vector<Float_t> tTrack_SigmaTgl2;         //! cov_matrix[9]
+    std::vector<Float_t> tTrack_Sigma1PtY;         //! cov_matrix[10]
+    std::vector<Float_t> tTrack_Sigma1PtZ;         //! cov_matrix[11]
+    std::vector<Float_t> tTrack_Sigma1PtSnp;       //! cov_matrix[12]
+    std::vector<Float_t> tTrack_Sigma1PtTgl;       //! cov_matrix[13]
+    std::vector<Float_t> tTrack_Sigma1Pt2;         //! cov_matrix[14]
+    std::vector<Float_t> tTrack_NSigmaPion;        //!
+    std::vector<Float_t> tTrack_NSigmaKaon;        //!
+    std::vector<Float_t> tTrack_NSigmaProton;      //!
+    std::vector<Float_t> tTrack_DCAxy;             //! pre-calculated DCA wrt PV
+    std::vector<Float_t> tTrack_DCAz;              //! pre-calculated DCA wrt PV
+    std::vector<UInt_t> tTrack_NTPCClusters;       //!
+    std::vector<Float_t> tTrack_NCrossedRows;      //!
+    std::vector<UInt_t> tTrack_NFindableClusters;  //!
+    std::vector<UInt_t> tTrack_NSharedClusters;    //!
+    std::vector<Float_t> tTrack_Chi2overNcls;      //!
+    std::vector<Bool_t> tTrack_IsKinkDaughter;     //!
     // TBits tTrack_TPCFitMap;             //!
     // TBits tTrack_TPCClusterMap;         //!
     // TBits tTrack_TPCSharedMap;          //!
-    Int_t tTrack_Idx_True;  //!
+    std::vector<ULong_t> tTrack_McEntry;  //!
 
     /*** Cuts ~ persistent, because they are set on `Initialize()` ***/
-
     Float_t kMax_NSigma_Pion;                //
     Float_t kMax_NSigma_Kaon;                //
     Float_t kMax_NSigma_Proton;              //

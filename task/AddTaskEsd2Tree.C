@@ -21,9 +21,7 @@ AliAnalysisTaskEsd2Tree *AddTaskEsd2Tree(Bool_t IsMC = kTRUE, Bool_t IsSignalMC 
     TString filename = AliAnalysisManager::GetCommonFileName();
 
     mgr->ConnectOutput(task, 1, mgr->CreateContainer("QA", TList::Class(), AliAnalysisManager::kOutputContainer, filename.Data()));
-
-    /* Note: an unconnected output container is needed to register the output file in the lego system */
-    mgr->CreateContainer("RESD", TTree::Class(), AliAnalysisManager::kOutputContainer, "SimpleTrees.root");
+    mgr->ConnectOutput(task, 2, mgr->CreateContainer("Events", TTree::Class(), AliAnalysisManager::kOutputContainer, filename.Data()));
 
     return task;
 }
