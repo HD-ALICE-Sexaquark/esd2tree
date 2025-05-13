@@ -5,8 +5,8 @@
 
 namespace Const {
 static constexpr int NEventsPerSignalMCLog = 10;
-static constexpr int NSignalReactionsPerEvent = 20;
-static constexpr std::string_view SimLog_EventHeader{" **** GTRIGI: IEVENT"};
+static constexpr int NReactionsPerEvent = 20;
+static constexpr std::string_view SimLog_EventHeader{"I-AliGenCocktail::Generate: Generator 3: AliGenSexaquarkReaction"};
 static constexpr std::string_view SimLog_ReactionMarker = "I-AliGenSexaquarkReaction::GenerateN:";
 }  // namespace Const
 

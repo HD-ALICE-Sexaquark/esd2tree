@@ -20,9 +20,7 @@ Checks: "*,
   -readability-implicit-bool-conversion,
   -bugprone-easily-swappable-parameters,
   -hicpp-braces-around-statements,
-  -hicpp-special-member-functions,
-  -cppcoreguidelines-special-member-functions,
   -cppcoreguidelines-init-variables,"
 WarningsAsErrors: ""
 HeaderFilterRegex: ""
-FormatStyle: none
+FormatStyle: 'file'

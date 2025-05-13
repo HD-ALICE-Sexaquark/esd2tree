@@ -4,6 +4,3 @@ CompileFlags:
     - "-I/home/ceres/borquez/some/alice/sw/ubuntu2204_x86-64/AliRoot/latest/include"
     - "-I/home/ceres/borquez/some/alice/sw/ubuntu2204_x86-64/ROOT/latest/include"
     - "-I/home/ceres/borquez/some/alice/sw/ubuntu2204_x86-64/VMC/latest/include/vmc"
-InlayHints:
-  Designators: No
-  ParameterNames: No

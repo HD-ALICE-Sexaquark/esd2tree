@@ -31,18 +31,19 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       fSignalLog_NewBasename(""),
       /*  */
       fVec_McEntry(),
-      fEvVec_ReactionID(Const::NEventsPerSignalMCLog, std::vector<unsigned int>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
+      fEvVec_ReactionID(Const::NEventsPerSignalMCLog, std::vector<unsigned int>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
       /*  */
       fOutputList(nullptr),
       fHist_Events_Bookkeeping(nullptr),
       fHist_Centrality(nullptr),
       fHist_CentralityINT7(nullptr),
+      fHist_Tracks_Bookkeeping(nullptr),
       /*  */
       fOutputTree(nullptr),
       /*  */
@@ -97,6 +98,12 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tTrack_Y(),
       tTrack_Z(),
       tTrack_Charge(),
+      tTrack_NSigmaPion(),
+      tTrack_NSigmaKaon(),
+      tTrack_NSigmaProton(),
+      tTrack_DCAxy(),
+      tTrack_DCAz(),
+      tTrack_IsKinkDaughter(),
 #if INCLUDE_MUCH_INFO
       tTrack_Alpha(),
       tTrack_Snp(),
@@ -117,18 +124,12 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
       tTrack_Sigma1PtSnp(),
       tTrack_Sigma1PtTgl(),
       tTrack_Sigma1Pt2(),
-      tTrack_NSigmaPion(),
-      tTrack_NSigmaKaon(),
-      tTrack_NSigmaProton(),
-      tTrack_DCAxy(),
-      tTrack_DCAz(),
       tTrack_NTPCClusters(),
       tTrack_NCrossedRows(),
       tTrack_NFindableClusters(),
       tTrack_NSharedClusters(),
       tTrack_Chi2overNcls(),
 #endif
-      tTrack_IsKinkDaughter(),
       // tTrack_TPCFitMap(),
       // tTrack_TPCClusterMap(),
       // tTrack_TPCSharedMap(),
@@ -160,18 +161,19 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       fSignalLog_NewBasename(""),
       /*  */
       fVec_McEntry(),
-      fEvVec_ReactionID(Const::NEventsPerSignalMCLog, std::vector<unsigned int>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Sexaquark_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
-      fEvVec_Nucleon_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NSignalReactionsPerEvent)),
+      fEvVec_ReactionID(Const::NEventsPerSignalMCLog, std::vector<unsigned int>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Sexaquark_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Px(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Py(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
+      fEvVec_Nucleon_Pz(Const::NEventsPerSignalMCLog, std::vector<float>(Const::NReactionsPerEvent)),
       /*  */
       fOutputList(nullptr),
       fHist_Events_Bookkeeping(nullptr),
       fHist_Centrality(nullptr),
       fHist_CentralityINT7(nullptr),
+      fHist_Tracks_Bookkeeping(nullptr),
       /*  */
       fOutputTree(nullptr),
       /*  */
@@ -226,6 +228,12 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tTrack_Y(),
       tTrack_Z(),
       tTrack_Charge(),
+      tTrack_NSigmaPion(),
+      tTrack_NSigmaKaon(),
+      tTrack_NSigmaProton(),
+      tTrack_DCAxy(),
+      tTrack_DCAz(),
+      tTrack_IsKinkDaughter(),
 #if INCLUDE_MUCH_INFO
       tTrack_Alpha(),
       tTrack_Snp(),
@@ -246,18 +254,12 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
       tTrack_Sigma1PtSnp(),
       tTrack_Sigma1PtTgl(),
       tTrack_Sigma1Pt2(),
-      tTrack_NSigmaPion(),
-      tTrack_NSigmaKaon(),
-      tTrack_NSigmaProton(),
-      tTrack_DCAxy(),
-      tTrack_DCAz(),
       tTrack_NTPCClusters(),
       tTrack_NCrossedRows(),
       tTrack_NFindableClusters(),
       tTrack_NSharedClusters(),
       tTrack_Chi2overNcls(),
 #endif
-      tTrack_IsKinkDaughter(),
       // tTrack_TPCFitMap(),
       // tTrack_TPCClusterMap(),
       // tTrack_TPCSharedMap(),
@@ -275,29 +277,34 @@ AliAnalysisTaskEsd2Tree::~AliAnalysisTaskEsd2Tree() {
 }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Tree.C` macro.
-void AliAnalysisTaskEsd2Tree::Initialize() {
-    // Print settings //
+void AliAnalysisTaskEsd2Tree::Initialize(bool is_mc, bool is_signal_mc) {
+
+    fIsMC = is_mc;
+    fIsSignalMC = is_signal_mc;
+
+    // print settings //
+
     AliInfo("Initializing...");
     AliInfo("Settings:");
     AliInfo("========");
-    AliInfoF(">> IsMC       = %i", (Int_t)fIsMC);
-    AliInfoF(">> IsSignalMC = %i", (Int_t)fIsSignalMC);
+    AliInfoF(">> IsMC       = %i", fIsMC);
+    AliInfoF(">> IsSignalMC = %i", fIsSignalMC);
 }
 
 // Executed at runtime //
 
 // Create output objects, called once at RUNTIME ~ execution on Grid.
 void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
-    //
-    AliAnalysisManager* man = AliAnalysisManager::GetAnalysisManager();
+
+    auto* man{AliAnalysisManager::GetAnalysisManager()};
     if (man == nullptr) AliFatal("ERROR: AliAnalysisManager couldn't be found.");
 
-    auto* inputHandler = dynamic_cast<AliESDInputHandler*>(man->GetInputEventHandler());
+    auto* inputHandler{dynamic_cast<AliESDInputHandler*>(man->GetInputEventHandler())};
     if (inputHandler == nullptr) AliFatal("ERROR: AliESDInputHandler couldn't be found.");
 
     fPIDResponse = inputHandler->GetPIDResponse();
 
-    // Prepare output list //
+    // Prepare output list and histograms //
 
     fOutputList = new TList();
     fOutputList->SetOwner(true);
@@ -311,7 +318,11 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
     fHist_CentralityINT7 = new TH1F("CentralityINT7", ";CentralityINT7;Counts", 11, 0., 110.);
     fOutputList->Add(fHist_CentralityINT7);
 
+    fHist_Tracks_Bookkeeping = new TH1F("Tracks_Bookkeeping", ";;Counts", 15, 0., 15.);
+    fOutputList->Add(fHist_Tracks_Bookkeeping);
+
     // Prepare output tree //
+
     fOutputTree = new TTree("Events", "Events");
     CreateEventsBranches();
     if (fIsMC) {
@@ -319,7 +330,9 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
         if (fIsSignalMC) CreateInjectedBranches();
     }
     CreateTracksBranches();
+
     // Post data //
+
     PostData(1, fOutputList);
     PostData(2, fOutputTree);
 }
@@ -328,12 +341,12 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
 // This function is loaded during `AliAnalysisManager::Notify()`.
 // It's called after `UserCreateOutputObjects()`, for each new file, and before the first `UserExec()`.
 Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
-    //
-    AliAnalysisManager* man = AliAnalysisManager::GetAnalysisManager();
+
+    auto* man{AliAnalysisManager::GetAnalysisManager()};
     if (man == nullptr) AliFatal("Analysis Manager not found");
-    TTree* man_tree = man->GetTree();
+    auto* man_tree{man->GetTree()};
     if (man_tree == nullptr) AliFatal("Analysis Manager Tree not found");
-    TFile* man_file = man_tree->GetCurrentFile();
+    auto* man_file{man_tree->GetCurrentFile()};
     if (man_file == nullptr) AliFatal("Analysis Manager File not found");
 
     // get AliEn path and tokenize it //
@@ -342,19 +355,19 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
     if (fAliEnPath == "") AliWarning("fAliEnPath couldn't be found.");
     AliInfoF("fAliEnPath: %s", fAliEnPath.Data());
 
-    TObjArray* tokens = fAliEnPath.Tokenize("/");
+    TObjArray* tokens{fAliEnPath.Tokenize("/")};
     if (fIsMC) {
         // path of signal MC ends with format `.../LHC23l1a3/A1.73/297595/001/AliESDs.root` //
         // and path of general purpose MC ends with format `.../LHC20e3a/297595/001/AliESDs.root` //
-        fDirNumber = (dynamic_cast<TObjString*>(tokens->At(tokens->GetEntries() - 2)))->GetString().Atof();
-        AliInfoF("Dir Number : %04i", (Int_t)fDirNumber);
+        fDirNumber = (dynamic_cast<TObjString*>(tokens->At(tokens->GetEntries() - 2)))->GetString().Atoi();
+        AliInfoF("Dir Number : %04i", (Int_t)fDirNumber);  // = 1
         if (fIsSignalMC) {
             BringSignalLogs();
             LoadSignalLogs();
         }
     } else {
         // path of data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root` //
-        TString aux_dir_nr = (dynamic_cast<TObjString*>(tokens->At(tokens->GetEntries() - 2)))->GetString();
+        auto aux_dir_nr{(dynamic_cast<TObjString*>(tokens->At(tokens->GetEntries() - 2)))->GetString()};
         aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 10));  // = "039.914"
         AliInfoF("Dir Number : %s", aux_dir_nr.Data());
         fDirNumber = TString(aux_dir_nr(0, 3)).Atoi();   // = 39
@@ -365,79 +378,101 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
 }
 
 // Main function, called per each event at RUNTIME ~ execution on Grid.
-void AliAnalysisTaskEsd2Tree::UserExec(Option_t*) {
-
-    // Load MC Gen. Event and PV //
-
-    if (fIsMC) {
-        fMC = MCEvent();
-        if (fMC == nullptr) AliFatal("AliMCEvent couldn't be found.");
-        fMC_PrimaryVertex = fMC->GetPrimaryVertex();
-        fPIDResponse->SetCurrentMCEvent(fMC);
-    }
-
-    // Load Reconstructed Event, PV and Magnetic Field //
-
-    fESD = dynamic_cast<AliESDEvent*>(InputEvent());
-    if (fESD == nullptr) AliFatal("AliESDEvent couldn't be found.");
-
-    fPrimaryVertex = fESD->GetPrimaryVertex();
-    fMagneticField = (Float_t)fESD->GetMagneticField();
-
-    fRunNumber = fESD->GetRunNumber();
-    fEventNumberInFile = fESD->GetEventNumberInFile();
-
-    // Event selection //
-
-    if (!PassesEventSelection()) return;
-
-    // Centrality //
-
-    auto* MultSelection = dynamic_cast<AliMultSelection*>(fESD->FindListObject("MultSelection"));
-    if (MultSelection == nullptr) AliFatal("AliMultSelection couldn't be found.");
-    fCentrality = MultSelection->GetMultiplicityPercentile("V0M");
-
-    fHist_Centrality->Fill(fCentrality);
-    if ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U) fHist_CentralityINT7->Fill(fCentrality);
-
-    // Main //
-
-    ProcessEvent();
-
+void AliAnalysisTaskEsd2Tree::UserExec(Option_t* option) {
+    // events //
+    if (!ProcessEvent()) return;
+    // mc particles //
     if (fIsMC) {
         if (fIsSignalMC) ProcessInjectedReactions();
         ProcessMCParticles();
     }
+    // tracks //
     ProcessTracks();
-
+    // end of event //
     fOutputTree->Fill();
-
-    // End of event //
-
     if (fIsMC) {
         ClearMCBranches();
         fVec_McEntry.clear();
     }
     ClearTracksBranches();
-
+    // post data //
     PostData(1, fOutputList);
     PostData(2, fOutputTree);
 }
 
 // # Events //
 
+bool AliAnalysisTaskEsd2Tree::ProcessEvent() {
+    // Load MC Event //
+    if (fIsMC) {
+        fMC = MCEvent();
+        if (fMC == nullptr) AliFatal("AliMCEvent couldn't be found.");
+        fPIDResponse->SetCurrentMCEvent(fMC);
+    }
+    // Load Reconstructed Event, PV and Magnetic Field //
+    fESD = dynamic_cast<AliESDEvent*>(InputEvent());
+    if (fESD == nullptr) AliFatal("AliESDEvent couldn't be found.");
+    // Assign some branches (1) //
+    fRunNumber = fESD->GetRunNumber();
+    // `fDirNumber` should be set in `UserNotify()`
+    // `fDirNumberB` should be set in `UserNotify()`
+    fEventNumberInFile = fESD->GetEventNumberInFile();
+    fPrimaryVertex = fESD->GetPrimaryVertex();
+    // Apply selection //
+    if (!PassesEventSelection()) return false;
+    // Assign rest of branches (2) //
+    auto* MultSelection{dynamic_cast<AliMultSelection*>(fESD->FindListObject("MultSelection"))};
+    if (MultSelection == nullptr) AliFatal("AliMultSelection couldn't be found.");
+    fCentrality = MultSelection->GetMultiplicityPercentile("V0M");
+    fMagneticField = static_cast<float>(fESD->GetMagneticField());
+    // Fill QA hist //
+    fHist_Centrality->Fill(fCentrality);
+    if ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U) fHist_CentralityINT7->Fill(fCentrality);
+    // Assign MC branches (3) //
+    if (fIsMC) {
+        fMC_PrimaryVertex = fMC->GetPrimaryVertex();
+        tEvent_PV_TrueXv = static_cast<float>(fMC_PrimaryVertex->GetX());
+        tEvent_PV_TrueYv = static_cast<float>(fMC_PrimaryVertex->GetY());
+        tEvent_PV_TrueZv = static_cast<float>(fMC_PrimaryVertex->GetZ());
+        tEvent_IsGenPileup = AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing");
+        tEvent_IsSBCPileup = AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing");
+    }
+    // Assign rest of branches (4) //
+    tEvent_PV_Xv = static_cast<float>(fPrimaryVertex->GetX());
+    tEvent_PV_Yv = static_cast<float>(fPrimaryVertex->GetY());
+    tEvent_PV_Zv = static_cast<float>(fPrimaryVertex->GetZ());
+    //
+    tEvent_PV_NContributors = fPrimaryVertex->GetNContributors();
+    tEvent_PV_Dispersion = static_cast<float>(fPrimaryVertex->GetDispersion());
+    //
+    double PV_CovMatrix[6];
+    fPrimaryVertex->GetCovarianceMatrix(PV_CovMatrix);
+    for (size_t i{0}; i < 6; ++i) tEvent_PV_CovMatrix[i] = static_cast<float>(PV_CovMatrix[i]);
+    //
+    const auto* PrimaryVertex_SPD{fESD->GetPrimaryVertexSPD()};
+    tEvent_SPD_PV_Zv = static_cast<float>(PrimaryVertex_SPD->GetZ());
+    double PV_SPD_CovMatrix[6];
+    PrimaryVertex_SPD->GetCovarianceMatrix(PV_SPD_CovMatrix);
+    tEvent_SPD_PV_ZvErr = static_cast<float>(PV_SPD_CovMatrix[5]);
+    //
+    tEvent_NTracks = static_cast<unsigned int>(fESD->GetNumberOfTracks());
+    tEvent_NTPCClusters = fESD->GetNumberOfTPCClusters();
+    tEvent_IsMB = ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U);
+    tEvent_IsHighMultV0 = ((fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U);
+    tEvent_IsHighMultSPD = ((fInputHandler->IsEventSelected() & AliVEvent::AliVEvent::kHighMultSPD) != 0U);
+    tEvent_IsCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U);
+    tEvent_IsSemiCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U);
+
+    return true;
+}
+
 // Apply event selection.
-Bool_t AliAnalysisTaskEsd2Tree::PassesEventSelection() {
+bool AliAnalysisTaskEsd2Tree::PassesEventSelection() {
 
     fHist_Events_Bookkeeping->Fill(0.);
-
-    // First Check //
-
     if (!fEventCuts.AcceptEvent(fESD)) return false;
     fHist_Events_Bookkeeping->Fill(1.);
-
-    // Reference: https://twiki.cern.ch/twiki/bin/viewauth/ALICE/AliDPGRunList18r1 //
-
+    // reference: https://twiki.cern.ch/twiki/bin/viewauth/ALICE/AliDPGRunList18r1 //
     if (!fIsMC && (fRunNumber == 296749 || fRunNumber == 296750 || fRunNumber == 296849 || fRunNumber == 296890 || fRunNumber == 297029 ||
                    fRunNumber == 297194 || fRunNumber == 297219 || fRunNumber == 297481)) {
         fEventCuts.UseTimeRangeCut();
@@ -445,73 +480,28 @@ Bool_t AliAnalysisTaskEsd2Tree::PassesEventSelection() {
         if (!fEventCuts.AcceptEvent(fESD)) return false;
     }
     fHist_Events_Bookkeeping->Fill(2.);
-
     // Pileup Events //
-
     if (!fEventCuts.PassedCut(AliEventCuts::kPileUp)) return false;
     fHist_Events_Bookkeeping->Fill(3.);
-
     // TPC Pileup Events //
-
     if (!fEventCuts.PassedCut(AliEventCuts::kTPCPileUp)) return false;
     fHist_Events_Bookkeeping->Fill(4.);
-
     // Important for data? //
-
     if (!fIsMC && fESD->GetHeader()->GetEventType() != 7) return false;
     fHist_Events_Bookkeeping->Fill(5.);
-
     // Trigger Selection //
-
-    Bool_t IsMB = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U;
-    Bool_t IsHighMultV0 = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U;
-    Bool_t IsHighMultSPD = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD) != 0U;
-    Bool_t IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U;
-    Bool_t IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U;
-
+    bool IsMB{(fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U};
+    bool IsHighMultV0{(fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U};
+    bool IsHighMultSPD{(fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD) != 0U};
+    bool IsCentral{(fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U};
+    bool IsSemiCentral{(fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U};
     if (!IsMB && !IsHighMultV0 && !IsHighMultSPD && !IsCentral && !IsSemiCentral) return false;
     fHist_Events_Bookkeeping->Fill(6.);
-
     // rec. PV z-vertex range //
-
     if (std::abs(fPrimaryVertex->GetZ()) > Cuts::Event::AbsMax_PV_Zv) return false;
     fHist_Events_Bookkeeping->Fill(7.);
 
     return true;
-}
-
-void AliAnalysisTaskEsd2Tree::ProcessEvent() {
-
-    if (fIsMC) {
-        tEvent_PV_TrueXv = (Float_t)fMC_PrimaryVertex->GetX();
-        tEvent_PV_TrueYv = (Float_t)fMC_PrimaryVertex->GetY();
-        tEvent_PV_TrueZv = (Float_t)fMC_PrimaryVertex->GetZ();
-        tEvent_IsGenPileup = AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing");
-        tEvent_IsSBCPileup = AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing");
-    }
-
-    tEvent_PV_NContributors = fPrimaryVertex->GetNContributors();
-    tEvent_PV_Dispersion = (Float_t)fPrimaryVertex->GetDispersion();
-    tEvent_PV_Xv = (Float_t)fPrimaryVertex->GetX();
-    tEvent_PV_Yv = (Float_t)fPrimaryVertex->GetY();
-    tEvent_PV_Zv = (Float_t)fPrimaryVertex->GetZ();
-    Double_t PV_CovMatrix[6];
-    fPrimaryVertex->GetCovarianceMatrix(PV_CovMatrix);
-    for (size_t i = 0; i < 6; ++i) tEvent_PV_CovMatrix[i] = (Float_t)PV_CovMatrix[i];
-
-    const AliESDVertex* PrimaryVertex_SPD = (AliESDVertex*)fESD->GetPrimaryVertexSPD();
-    tEvent_SPD_PV_Zv = (Float_t)PrimaryVertex_SPD->GetZ();
-    Double_t PV_SPD_CovMatrix[6];
-    PrimaryVertex_SPD->GetCovarianceMatrix(PV_SPD_CovMatrix);
-    tEvent_SPD_PV_ZvErr = (Float_t)PV_SPD_CovMatrix[5];
-
-    tEvent_NTracks = (UInt_t)fESD->GetNumberOfTracks();
-    tEvent_NTPCClusters = fESD->GetNumberOfTPCClusters();
-    tEvent_IsMB = ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U);
-    tEvent_IsHighMultV0 = ((fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U);
-    tEvent_IsHighMultSPD = ((fInputHandler->IsEventSelected() & AliVEvent::AliVEvent::kHighMultSPD) != 0U);
-    tEvent_IsCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U);
-    tEvent_IsSemiCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U);
 }
 
 // # Trees //
@@ -589,6 +579,13 @@ void AliAnalysisTaskEsd2Tree::CreateTracksBranches() {
     fOutputTree->Branch("Track_Y", &tTrack_Y);
     fOutputTree->Branch("Track_Z", &tTrack_Z);
     fOutputTree->Branch("Track_Charge", &tTrack_Charge);
+    fOutputTree->Branch("Track_NSigmaPion", &tTrack_NSigmaPion);
+    fOutputTree->Branch("Track_NSigmaKaon", &tTrack_NSigmaKaon);
+    fOutputTree->Branch("Track_NSigmaProton", &tTrack_NSigmaProton);
+    fOutputTree->Branch("Track_DCAxy", &tTrack_DCAxy);
+    fOutputTree->Branch("Track_DCAz", &tTrack_DCAz);
+    fOutputTree->Branch("Track_IsKinkDaughter", &tTrack_IsKinkDaughter);
+    if (fIsMC) fOutputTree->Branch("Track_McEntry", &tTrack_McEntry);
 #if INCLUDE_MUCH_INFO
     fOutputTree->Branch("Track_Alpha", &tTrack_Alpha);
     fOutputTree->Branch("Track_Snp", &tTrack_Snp);
@@ -609,29 +606,21 @@ void AliAnalysisTaskEsd2Tree::CreateTracksBranches() {
     fOutputTree->Branch("Track_Sigma1PtSnp", &tTrack_Sigma1PtSnp);
     fOutputTree->Branch("Track_Sigma1PtTgl", &tTrack_Sigma1PtTgl);
     fOutputTree->Branch("Track_Sigma1Pt2", &tTrack_Sigma1Pt2);
-    fOutputTree->Branch("Track_NSigmaPion", &tTrack_NSigmaPion);
-    fOutputTree->Branch("Track_NSigmaKaon", &tTrack_NSigmaKaon);
-    fOutputTree->Branch("Track_NSigmaProton", &tTrack_NSigmaProton);
-    fOutputTree->Branch("Track_DCAxy", &tTrack_DCAxy);
-    fOutputTree->Branch("Track_DCAz", &tTrack_DCAz);
     fOutputTree->Branch("Track_NTPCClusters", &tTrack_NTPCClusters);
     fOutputTree->Branch("Track_NCrossedRows", &tTrack_NCrossedRows);
     fOutputTree->Branch("Track_NFindableClusters", &tTrack_NFindableClusters);
     fOutputTree->Branch("Track_NSharedClusters", &tTrack_NSharedClusters);
     fOutputTree->Branch("Track_Chi2overNcls", &tTrack_Chi2overNcls);
 #endif
-    fOutputTree->Branch("Track_IsKinkDaughter", &tTrack_IsKinkDaughter);
     // fOutputTree->Branch("TPCFitMap", &tTrack_TPCFitMap);
     // fOutputTree->Branch("TPCClusterMap", &tTrack_TPCClusterMap);
     // fOutputTree->Branch("TPCSharedMap", &tTrack_TPCSharedMap);
-    if (fIsMC) fOutputTree->Branch("Track_McEntry", &tTrack_McEntry);
 }
 
 // # MC Generated //
 
 // Loop over MC particles in a single event.
 void AliAnalysisTaskEsd2Tree::ProcessMCParticles() {
-    AliMCParticle* mcPart{nullptr};
     // prepare vectors
     const int n_mc{fMC->GetNumberOfTracks()};
     fVec_McEntry.resize(n_mc, -1);
@@ -650,9 +639,9 @@ void AliAnalysisTaskEsd2Tree::ProcessMCParticles() {
     tMC_IsSecFromMat.reserve(n_mc);
     tMC_IsSecFromWeak.reserve(n_mc);
     // read mc particles
-    Long_t mc_entry = 0;
+    long mc_entry{0};
     for (auto mc_idx{0}; mc_idx < n_mc; ++mc_idx) {
-        mcPart = dynamic_cast<AliMCParticle*>(fMC->GetTrack(mc_idx));
+        auto* mcPart{dynamic_cast<AliMCParticle*>(fMC->GetTrack(mc_idx))};
         if (mcPart == nullptr) continue;
         // Remove trash //
         if (mcPart->P() < Cuts::MC::Min_Momentum) continue;
@@ -699,37 +688,44 @@ void AliAnalysisTaskEsd2Tree::ClearMCBranches() {
 // Loop over the reconstructed tracks in a single event.
 void AliAnalysisTaskEsd2Tree::ProcessTracks() {
 
-    AliESDtrack* track{nullptr};
-    const AliExternalTrackParam* trackInnerParam{nullptr};
-
     for (auto esd_idx{0}; esd_idx < fESD->GetNumberOfTracks(); ++esd_idx) {
-        track = fESD->GetTrack(esd_idx);
-        trackInnerParam = track->GetInnerParam();
-        // Track selection //
-        if (trackInnerParam == nullptr) continue;
-        if (trackInnerParam->Pt() < Cuts::Track::Min_Pt || trackInnerParam->Pt() > Cuts::Track::Max_Pt) continue;
-        if (!PassesTrackSelection(track)) continue;
+        auto* track{fESD->GetTrack(esd_idx)};
+        const auto* inner_param{track->GetInnerParam()};
+        // track selection //
+        fHist_Tracks_Bookkeeping->Fill(0.);
+        if (inner_param == nullptr) continue;
+        fHist_Tracks_Bookkeeping->Fill(1.);
+        if (!PassesTrackSelection(track, inner_param)) continue;
 // Assign branches //
 #if WRITE_ESD_INDICES
         tTrack_EsdIdx.push_back((Long_t)esd_idx);
 #endif
         double momentum[3];
-        trackInnerParam->GetPxPyPz(momentum);
+        inner_param->GetPxPyPz(momentum);
         tTrack_Px.push_back(static_cast<float>(momentum[0]));
         tTrack_Py.push_back(static_cast<float>(momentum[1]));
         tTrack_Pz.push_back(static_cast<float>(momentum[2]));
         double position[3];
-        trackInnerParam->GetXYZ(position);
+        inner_param->GetXYZ(position);
         tTrack_X.push_back(static_cast<float>(position[0]));
         tTrack_Y.push_back(static_cast<float>(position[1]));
         tTrack_Z.push_back(static_cast<float>(position[2]));
-        tTrack_Charge.push_back(trackInnerParam->Charge());
+        tTrack_Charge.push_back(inner_param->Charge());
+        tTrack_NSigmaPion.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion));
+        tTrack_NSigmaKaon.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon));
+        tTrack_NSigmaProton.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton));
+        tTrack_IsKinkDaughter.push_back(track->GetKinkIndex(0) > 0);
+        float AuxDCAxy, AuxDCAz;
+        track->GetImpactParameters(AuxDCAxy, AuxDCAz);
+        tTrack_DCAxy.push_back(AuxDCAxy);
+        tTrack_DCAz.push_back(AuxDCAz);
+        if (fIsMC) tTrack_McEntry.push_back(fVec_McEntry[std::abs(track->GetLabel())]);
 #if INCLUDE_MUCH_INFO
-        tTrack_Alpha.push_back((Float_t)trackInnerParam->GetAlpha());
-        tTrack_Snp.push_back((Float_t)trackInnerParam->GetSnp());
-        tTrack_Tgl.push_back((Float_t)trackInnerParam->GetTgl());
-        tTrack_Signed1Pt.push_back((Float_t)trackInnerParam->GetSigned1Pt());
-        const Double_t* covariance_matrix = trackInnerParam->GetCovariance();
+        tTrack_Alpha.push_back((Float_t)inner_param->GetAlpha());
+        tTrack_Snp.push_back((Float_t)inner_param->GetSnp());
+        tTrack_Tgl.push_back((Float_t)inner_param->GetTgl());
+        tTrack_Signed1Pt.push_back((Float_t)inner_param->GetSigned1Pt());
+        const Double_t* covariance_matrix = inner_param->GetCovariance();
         tTrack_SigmaY2.push_back(covariance_matrix[0]);
         tTrack_SigmaZY.push_back(covariance_matrix[1]);
         tTrack_SigmaZ2.push_back(covariance_matrix[2]);
@@ -745,64 +741,60 @@ void AliAnalysisTaskEsd2Tree::ProcessTracks() {
         tTrack_Sigma1PtSnp.push_back(covariance_matrix[12]);
         tTrack_Sigma1PtTgl.push_back(covariance_matrix[13]);
         tTrack_Sigma1Pt2.push_back(covariance_matrix[14]);
-        tTrack_NSigmaPion.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion));
-        tTrack_NSigmaKaon.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon));
-        tTrack_NSigmaProton.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton));
-        Float_t AuxDCAxy, AuxDCAz;
-        track->GetImpactParameters(AuxDCAxy, AuxDCAz);
-        tTrack_DCAxy.push_back(AuxDCAxy);
-        tTrack_DCAz.push_back(AuxDCAz);
         tTrack_NTPCClusters.push_back(track->GetTPCNcls());  // Note: capital N
         tTrack_NCrossedRows.push_back(track->GetTPCCrossedRows());
         tTrack_NFindableClusters.push_back(track->GetTPCNclsF());
         tTrack_NSharedClusters.push_back(track->GetTPCnclsS());
         tTrack_Chi2overNcls.push_back(static_cast<Float_t>(track->GetTPCNcls() > 0 ? track->GetTPCchi2() / (Double_t)track->GetTPCNcls() : 999.));
 #endif
-        tTrack_IsKinkDaughter.push_back(track->GetKinkIndex(0) > 0);
         // tTrack_TPCFitMap = track->GetTPCFitMap();
         // tTrack_TPCClusterMap = track->GetTPCClusterMap();
         // tTrack_TPCSharedMap = track->GetTPCSharedMap();
-        if (fIsMC) tTrack_McEntry.push_back(fVec_McEntry[std::abs(track->GetLabel())]);
     }  // end of loop over tracks
 }
 
 // Check if track passes selection and fill bookkeeping histograms.
-Bool_t AliAnalysisTaskEsd2Tree::PassesTrackSelection(AliESDtrack* track) {
+bool AliAnalysisTaskEsd2Tree::PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param) {
 
-    const AliExternalTrackParam* trackInnerParam = track->GetInnerParam();
+    bool its_status{((track->GetStatus() & AliESDtrack::kITSin) == 0U) && ((track->GetStatus() & AliESDtrack::kITSout) == 0U) &&
+                    ((track->GetStatus() & AliESDtrack::kITSrefit) == 0U)};
+    if (Cuts::Track::TurnedOn_StatusCuts && !its_status) return false;
+    fHist_Tracks_Bookkeeping->Fill(2.);
 
-    // Fulfill at least one of the PID cuts //
+    if (std::abs(inner_param->Eta()) > Cuts::Track::AbsMax_Eta) return false;
+    fHist_Tracks_Bookkeeping->Fill(3.);
 
-    Float_t n_sigma_proton = fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton);
-    Float_t n_sigma_kaon = fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon);
-    Float_t n_sigma_pion = fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion);
+    float n_sigma_proton{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton)};
+    float n_sigma_kaon{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon)};
+    float n_sigma_pion{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion)};
     if (std::abs(n_sigma_proton) > Cuts::Track::AbsMax_NSigma_Proton && std::abs(n_sigma_kaon) > Cuts::Track::AbsMax_NSigma_Kaon &&
         std::abs(n_sigma_pion) > Cuts::Track::AbsMax_NSigma_Pion) {
         return false;
     }
+    fHist_Tracks_Bookkeeping->Fill(4.);
 
-    if (std::abs(trackInnerParam->Eta()) > Cuts::Track::AbsMax_Eta) return false;
+    float DCAxy_wrtPV, DCAz_wrtPV;
+    track->GetImpactParameters(DCAxy_wrtPV, DCAz_wrtPV);
+    if (std::abs(DCAxy_wrtPV) < Cuts::Track::Min_DCAxy_wrtPV) return false;
+    fHist_Tracks_Bookkeeping->Fill(5.);
 
-    Double_t NTPCClusters = track->GetTPCNcls();
+    if (inner_param->Pt() < Cuts::Track::Min_Pt || inner_param->Pt() > Cuts::Track::Max_Pt) return false;
+    fHist_Tracks_Bookkeeping->Fill(6.);
+
+    double NTPCClusters{static_cast<double>(track->GetTPCNcls())};
     if (NTPCClusters < Cuts::Track::Min_NTPCClusters) return false;
+    fHist_Tracks_Bookkeeping->Fill(7.);
 
-    Double_t Chi2PerNTPCClusters = NTPCClusters > 1E-4 ? track->GetTPCchi2() / (Double_t)track->GetTPCNcls() : 999.;
+    double Chi2PerNTPCClusters{NTPCClusters > 0. ? track->GetTPCchi2() / NTPCClusters : 999.};
     if (Chi2PerNTPCClusters > Cuts::Track::Max_Chi2PerNTPCClusters) return false;
+    fHist_Tracks_Bookkeeping->Fill(8.);
 
-    // >> TPC and ITS status
-    Bool_t tpc_status = ((track->GetStatus() & AliESDtrack::kTPCout) != 0U) && ((track->GetStatus() & AliESDtrack::kTPCrefit) != 0U);
+    bool tpc_status{((track->GetStatus() & AliESDtrack::kTPCout) != 0U) && ((track->GetStatus() & AliESDtrack::kTPCrefit) != 0U)};
     if (Cuts::Track::TurnedOn_StatusCuts && !tpc_status) return false;
-
-    Bool_t its_status = ((track->GetStatus() & AliESDtrack::kITSin) == 0U) && ((track->GetStatus() & AliESDtrack::kITSout) == 0U) &&
-                        ((track->GetStatus() & AliESDtrack::kITSrefit) == 0U);
-    if (Cuts::Track::TurnedOn_StatusCuts && !its_status) return false;
+    fHist_Tracks_Bookkeeping->Fill(9.);
 
     if (Cuts::Track::TurnedOn_RejectKinks && track->GetKinkIndex(0) > 0) return false;
-
-    Float_t DCAxy_wrtPV, DCAz_wrtPV;
-    track->GetImpactParameters(DCAxy_wrtPV, DCAz_wrtPV);
-    Float_t DCA_wrtPV = std::sqrt(DCAxy_wrtPV * DCAxy_wrtPV + DCAz_wrtPV * DCAz_wrtPV);
-    if (std::abs(DCAxy_wrtPV) < Cuts::Track::Min_DCAxy_wrtPV) return false;
+    fHist_Tracks_Bookkeeping->Fill(10.);
 
     return true;
 }
@@ -819,6 +811,13 @@ void AliAnalysisTaskEsd2Tree::ClearTracksBranches() {
     tTrack_Y.clear();
     tTrack_Z.clear();
     tTrack_Charge.clear();
+    tTrack_NSigmaPion.clear();
+    tTrack_NSigmaKaon.clear();
+    tTrack_NSigmaProton.clear();
+    tTrack_DCAxy.clear();
+    tTrack_DCAz.clear();
+    tTrack_IsKinkDaughter.clear();
+    if (fIsMC) tTrack_McEntry.clear();
 #if INCLUDE_MUCH_INFO
     tTrack_Alpha.clear();
     tTrack_Snp.clear();
@@ -839,22 +838,15 @@ void AliAnalysisTaskEsd2Tree::ClearTracksBranches() {
     tTrack_Sigma1PtSnp.clear();
     tTrack_Sigma1PtTgl.clear();
     tTrack_Sigma1Pt2.clear();
-    tTrack_NSigmaPion.clear();
-    tTrack_NSigmaKaon.clear();
-    tTrack_NSigmaProton.clear();
-    tTrack_DCAxy.clear();
-    tTrack_DCAz.clear();
     tTrack_NTPCClusters.clear();
     tTrack_NCrossedRows.clear();
     tTrack_NFindableClusters.clear();
     tTrack_NSharedClusters.clear();
     tTrack_Chi2overNcls.clear();
 #endif
-    tTrack_IsKinkDaughter.clear();
     // tTrack_TPCFitMap.clear();
     // tTrack_TPCClusterMap.clear();
     // tTrack_TPCSharedMap.clear();
-    if (fIsMC) tTrack_McEntry.clear();
 }
 
 // # Injected Reactions //
@@ -916,35 +908,50 @@ Bool_t AliAnalysisTaskEsd2Tree::LoadSignalLogs() {
         return false;
     }
 
-    int ev{-1};
-    int re{0};
+    int event_n{-1};
+    int react_id{0};
 
     std::string line;
     while (std::getline(SimLogFile, line)) {
         // a new event has appeared //
         if (line.rfind(Const::SimLog_EventHeader) == 0) {
-            ++ev;
-            re = 0;
+            ++event_n;
+            // std::cout << "Reading Event " << event_n << '\n'; // DEBUG
+            react_id = 0;
             continue;
         }
-        if (ev >= 0) {
+        if (event_n >= 0) {
             if (line.rfind(Const::SimLog_ReactionMarker, 0) == 0) {
                 std::string data_part{line.substr(Const::SimLog_ReactionMarker.length() + 1)};
+                // std::cout << data_part << '\n'; // DEBUG
                 std::stringstream ss{data_part};
                 std::string temp_parse_buffer;
                 // clang-format off
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_ReactionID[ev][re] = std::stoul(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Px[ev][re] = std::stof(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Py[ev][re] = std::stof(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Pz[ev][re] = std::stof(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Px[ev][re] = std::stof(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Py[ev][re] = std::stof(temp_parse_buffer);
-                std::getline(ss, temp_parse_buffer); fEvVec_Nucleon_Pz[ev][re] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_ReactionID[event_n][react_id] = std::stoul(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Px[event_n][react_id] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Py[event_n][react_id] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Pz[event_n][react_id] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Px[event_n][react_id] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Py[event_n][react_id] = std::stof(temp_parse_buffer);
+                std::getline(ss, temp_parse_buffer); fEvVec_Nucleon_Pz[event_n][react_id] = std::stof(temp_parse_buffer);
                 // clang-format on
-                ++re;
+                ++react_id;
             }
         }
     }  // finish reading lines
+    /*
+    // DEBUG
+    for (int ev_print{0}; ev_print < Const::NEventsPerSignalMCLog; ++ev_print) {
+        for (int r_print{0}; r_print < Const::NReactionsPerEvent; ++r_print) {
+            std::cout << "Event " << ev_print << ", Reaction " << r_print << ":" << '\n';
+            std::cout << "  ReactionID: " << fEvVec_ReactionID[ev_print][r_print] << '\n';
+            std::cout << "  Px: " << fEvVec_Sexaquark_Px[ev_print][r_print] << ", Py: " << fEvVec_Sexaquark_Py[ev_print][r_print]
+                        << ", Pz: " << fEvVec_Sexaquark_Pz[ev_print][r_print] << '\n';
+            std::cout << "  NPx: " << fEvVec_Nucleon_Px[ev_print][r_print] << ", NPy: " << fEvVec_Nucleon_Py[ev_print][r_print]
+                        << ", NPz: " << fEvVec_Nucleon_Pz[ev_print][r_print] << '\n';
+        }
+    }
+    */
 
     AliInfoF("Closing file %s ...", new_path.Data());
     SimLogFile.close();

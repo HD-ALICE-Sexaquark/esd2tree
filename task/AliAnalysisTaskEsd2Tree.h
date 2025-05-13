@@ -1,7 +1,7 @@
 #ifndef E2V_TASK_H
 #define E2V_TASK_H
 
-#define WRITE_ESD_INDICES 1
+#define WRITE_ESD_INDICES 0
 #define INCLUDE_MUCH_INFO 0
 
 #include <array>
@@ -61,15 +61,11 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
 
     // Settings ~ stored in Analysis Manager //
-    void IsMC(Bool_t is_mc, Bool_t is_signal_mc = kFALSE) {
-        fIsMC = is_mc;
-        fIsSignalMC = is_signal_mc;
-    };
-    void Initialize();
+    void Initialize(bool is_mc, bool is_signal_mc = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
-    Bool_t UserNotify();
+    bool UserNotify();
     void UserExec(Option_t* option);
     void Terminate(Option_t* option) {}
 
@@ -80,8 +76,8 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     void CreateTracksBranches();
 
     // Events //
-    void ProcessEvent();
-    Bool_t PassesEventSelection();
+    bool ProcessEvent();
+    bool PassesEventSelection();
 
     // MC Particles //
     void ProcessMCParticles();
@@ -89,18 +85,18 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
     // Tracks //
     void ProcessTracks();
-    Bool_t PassesTrackSelection(AliESDtrack* track);
+    bool PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param);
     void ClearTracksBranches();
 
     // Injected Reactions //
     void ProcessInjectedReactions();
     void BringSignalLogs();
-    Bool_t LoadSignalLogs();
+    bool LoadSignalLogs();
 
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
-    Bool_t fIsMC;        // kTRUE if MC simulation, kFALSE if data
-    Bool_t fIsSignalMC;  // kTRUE to read and load signal logs
+    bool fIsMC;        // kTRUE if MC simulation, kFALSE if data
+    bool fIsSignalMC;  // kTRUE to read and load signal logs
 
     // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
@@ -139,6 +135,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     TH1F* fHist_Events_Bookkeeping;  //!
     TH1F* fHist_Centrality;          //!
     TH1F* fHist_CentralityINT7;      //!
+    TH1F* fHist_Tracks_Bookkeeping;  //!
 
     // Trees //
     TTree* fOutputTree;  //!
@@ -190,13 +187,20 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 #if WRITE_ESD_INDICES
     std::vector<Long_t> tTrack_EsdIdx;  //! DEBUG
 #endif
-    std::vector<Float_t> tTrack_Px;    //! inner parametrization
-    std::vector<Float_t> tTrack_Py;    //! inner parametrization
-    std::vector<Float_t> tTrack_Pz;    //! inner parametrization
-    std::vector<Float_t> tTrack_X;     //!
-    std::vector<Float_t> tTrack_Y;     //!
-    std::vector<Float_t> tTrack_Z;     //!
-    std::vector<Int_t> tTrack_Charge;  //!
+    std::vector<Float_t> tTrack_Px;             //! inner parametrization
+    std::vector<Float_t> tTrack_Py;             //! inner parametrization
+    std::vector<Float_t> tTrack_Pz;             //! inner parametrization
+    std::vector<Float_t> tTrack_X;              //!
+    std::vector<Float_t> tTrack_Y;              //!
+    std::vector<Float_t> tTrack_Z;              //!
+    std::vector<Int_t> tTrack_Charge;           //!
+    std::vector<Float_t> tTrack_NSigmaPion;     //!
+    std::vector<Float_t> tTrack_NSigmaKaon;     //!
+    std::vector<Float_t> tTrack_NSigmaProton;   //!
+    std::vector<Float_t> tTrack_DCAxy;          //! pre-calculated DCA wrt PV
+    std::vector<Float_t> tTrack_DCAz;           //! pre-calculated DCA wrt PV
+    std::vector<Bool_t> tTrack_IsKinkDaughter;  //!
+    std::vector<ULong_t> tTrack_McEntry;        //!
 #if INCLUDE_MUCH_INFO
     std::vector<Float_t> tTrack_Alpha;             //!
     std::vector<Float_t> tTrack_Snp;               //! local sine of the track momentum azimuthal angle
@@ -217,22 +221,15 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     std::vector<Float_t> tTrack_Sigma1PtSnp;       //! cov_matrix[12]
     std::vector<Float_t> tTrack_Sigma1PtTgl;       //! cov_matrix[13]
     std::vector<Float_t> tTrack_Sigma1Pt2;         //! cov_matrix[14]
-    std::vector<Float_t> tTrack_NSigmaPion;        //!
-    std::vector<Float_t> tTrack_NSigmaKaon;        //!
-    std::vector<Float_t> tTrack_NSigmaProton;      //!
-    std::vector<Float_t> tTrack_DCAxy;             //! pre-calculated DCA wrt PV
-    std::vector<Float_t> tTrack_DCAz;              //! pre-calculated DCA wrt PV
     std::vector<UInt_t> tTrack_NTPCClusters;       //!
     std::vector<Float_t> tTrack_NCrossedRows;      //!
     std::vector<UInt_t> tTrack_NFindableClusters;  //!
     std::vector<UInt_t> tTrack_NSharedClusters;    //!
     std::vector<Float_t> tTrack_Chi2overNcls;      //!
 #endif
-    std::vector<Bool_t> tTrack_IsKinkDaughter;  //!
     // TBits tTrack_TPCFitMap;             //!
     // TBits tTrack_TPCClusterMap;         //!
     // TBits tTrack_TPCSharedMap;          //!
-    std::vector<ULong_t> tTrack_McEntry;  //!
 
     ClassDef(AliAnalysisTaskEsd2Tree, 13);  // = number of persistent members
 };
