@@ -26,3 +26,9 @@
 **/RUN3
 **/sexaquark
 **/ilya
+.env
+**.fquota
+scripts/**/
+scripts/RN_**.txt
+scripts_mc/**/
+scripts_mc/RN_**.txt

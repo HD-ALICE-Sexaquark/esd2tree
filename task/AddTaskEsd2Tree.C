@@ -4,10 +4,10 @@
 AliAnalysisTaskEsd2Tree *AddTaskEsd2Tree(Bool_t IsMC = kTRUE, Bool_t IsSignalMC = kTRUE) {
 
     AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
-    if (!mgr) return nullptr;
+    if (mgr == nullptr) return nullptr;
 
     AliAnalysisTaskEsd2Tree *task = new AliAnalysisTaskEsd2Tree("AliAnalysisTaskEsd2Tree");
-    if (!task) return nullptr;
+    if (task == nullptr) return nullptr;
 
     task->SelectCollisionCandidates(AliVEvent::kINT7);  // from `AliPhysicsSelectionTask`
 

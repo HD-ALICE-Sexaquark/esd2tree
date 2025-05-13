@@ -1,6 +1,9 @@
 #ifndef ALIANALYSISTASKESD2TREE_H
 #define ALIANALYSISTASKESD2TREE_H
 
+#define WRITE_ESD_INDICES 1
+
+#include <array>
 #include <fstream>
 #include <unordered_map>
 #include <vector>
@@ -69,7 +72,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     void UserCreateOutputObjects();
     Bool_t UserNotify();
     void UserExec(Option_t* option);
-    void Terminate(Option_t* option) { return; }
+    void Terminate(Option_t* option) {}
 
     /* Tree */
     void AssociateEventsBranches();
@@ -103,14 +106,13 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t fIsSignalMC;  // kTRUE to read and load signal logs
 
     /* AliRoot Objects */
-    AliMCEvent* fMC;                //! MC event
-    AliVVertex* fMC_PrimaryVertex;  //! MC gen. (or true) primary vertex
-    AliESDEvent* fESD;              //! reconstructed event
-    AliESDVertex* fPrimaryVertex;   //! primary vertex
-    AliPIDResponse* fPIDResponse;   //! pid response object
-    AliEventCuts fEventCuts;        //! event cuts
+    AliMCEvent* fMC;                      //! MC event
+    const AliVVertex* fMC_PrimaryVertex;  //! MC gen. (or true) primary vertex
+    AliESDEvent* fESD;                    //! reconstructed event
+    const AliESDVertex* fPrimaryVertex;   //! primary vertex
+    AliPIDResponse* fPIDResponse;         //! pid response object
+    AliEventCuts fEventCuts;              //! event cuts
 
-    TString fSignalSimSet;   //! signal simulations set (e.g. "A1.8", "H2.01")
     UInt_t fRunNumber;       //! run number
     UInt_t fDirNumber;       //! directory number
     UInt_t fDirNumberB;      //! component after-the-dot of data directories
@@ -120,7 +122,6 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
 
     /* Signal Logs */
     TString fAliEnPath;              //! loaded in `UserNotify()`
-    TString fReactionChannel;        //! derived from `fAliEnPath` in `UserNotify()`
     TString fSignalLog_NewBasename;  //!
 
     /* Utilities */
@@ -144,26 +145,26 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     /** Trees **/
     TTree* fOutputTree;  //!
     /* -- Event properties */
-    Float_t tEvent_PV_TrueXv;        //!
-    Float_t tEvent_PV_TrueYv;        //!
-    Float_t tEvent_PV_TrueZv;        //!
-    Bool_t tEvent_IsGenPileup;       //!
-    Bool_t tEvent_IsSBCPileup;       //!
-    Int_t tEvent_PV_NContributors;   //!
-    Float_t tEvent_PV_Dispersion;    //!
-    Float_t tEvent_PV_Xv;            //!
-    Float_t tEvent_PV_Yv;            //!
-    Float_t tEvent_PV_Zv;            //!
-    Float_t tEvent_PV_CovMatrix[6];  //!
-    Float_t tEvent_SPD_PV_Zv;        //!
-    Float_t tEvent_SPD_PV_ZvErr;     //!
-    UInt_t tEvent_NTracks;           //!
-    Int_t tEvent_NTPCClusters;       //!
-    Bool_t tEvent_IsMB;              //!
-    Bool_t tEvent_IsHighMultV0;      //!
-    Bool_t tEvent_IsHighMultSPD;     //!
-    Bool_t tEvent_IsCentral;         //!
-    Bool_t tEvent_IsSemiCentral;     //!
+    Float_t tEvent_PV_TrueXv;                    //!
+    Float_t tEvent_PV_TrueYv;                    //!
+    Float_t tEvent_PV_TrueZv;                    //!
+    Bool_t tEvent_IsGenPileup;                   //!
+    Bool_t tEvent_IsSBCPileup;                   //!
+    Int_t tEvent_PV_NContributors;               //!
+    Float_t tEvent_PV_Dispersion;                //!
+    Float_t tEvent_PV_Xv;                        //!
+    Float_t tEvent_PV_Yv;                        //!
+    Float_t tEvent_PV_Zv;                        //!
+    std::array<Float_t, 6> tEvent_PV_CovMatrix;  //!
+    Float_t tEvent_SPD_PV_Zv;                    //!
+    Float_t tEvent_SPD_PV_ZvErr;                 //!
+    UInt_t tEvent_NTracks;                       //!
+    Int_t tEvent_NTPCClusters;                   //!
+    Bool_t tEvent_IsMB;                          //!
+    Bool_t tEvent_IsHighMultV0;                  //!
+    Bool_t tEvent_IsHighMultSPD;                 //!
+    Bool_t tEvent_IsCentral;                     //!
+    Bool_t tEvent_IsSemiCentral;                 //!
     /* -- Signal reaction properties */
     std::vector<UInt_t> tInjected_ReactionID;   //!
     std::vector<Float_t> tInjected_Px;          //!
@@ -188,6 +189,9 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     std::vector<Bool_t> tMC_IsSecFromMat;    //!
     std::vector<Bool_t> tMC_IsSecFromWeak;   //!
     /* -- Tracks properties */
+#if WRITE_ESD_INDICES
+    std::vector<Long_t> tTrack_EsdIdx;  //! DEBUG
+#endif
     std::vector<Float_t> tTrack_Px;                //! inner parametrization
     std::vector<Float_t> tTrack_Py;                //! inner parametrization
     std::vector<Float_t> tTrack_Pz;                //! inner parametrization
