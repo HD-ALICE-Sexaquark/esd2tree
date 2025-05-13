@@ -1,11 +1,11 @@
-#ifndef ALIANALYSISTASKESD2TREE_H
-#define ALIANALYSISTASKESD2TREE_H
+#ifndef E2V_TASK_H
+#define E2V_TASK_H
 
 #define WRITE_ESD_INDICES 1
+#define INCLUDE_MUCH_INFO 0
 
 #include <array>
 #include <fstream>
-#include <unordered_map>
 #include <vector>
 
 #include "TArray.h"
@@ -60,52 +60,49 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);
     AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
 
-    /* Settings ~ stored in Analysis Manager */
+    // Settings ~ stored in Analysis Manager //
     void IsMC(Bool_t is_mc, Bool_t is_signal_mc = kFALSE) {
         fIsMC = is_mc;
         fIsSignalMC = is_signal_mc;
     };
     void Initialize();
-    void DefineTracksCuts(TString cuts_option);
 
-    /* Main ~ executed at runtime */
+    // Main ~ executed at runtime //
     void UserCreateOutputObjects();
     Bool_t UserNotify();
     void UserExec(Option_t* option);
     void Terminate(Option_t* option) {}
 
-    /* Tree */
-    void AssociateEventsBranches();
-    void AssociateInjectedBranches();
-    void AssociateMCBranches();
-    void AssociateTracksBranches();
+    // Tree //
+    void CreateEventsBranches();
+    void CreateInjectedBranches();
+    void CreateMCBranches();
+    void CreateTracksBranches();
 
-    /* Events */
+    // Events //
     void ProcessEvent();
     Bool_t PassesEventSelection();
 
-    /* MC Particles */
+    // MC Particles //
     void ProcessMCParticles();
     void ClearMCBranches();
 
-    /* Tracks */
+    // Tracks //
     void ProcessTracks();
     Bool_t PassesTrackSelection(AliESDtrack* track);
     void ClearTracksBranches();
 
-    /* Injected Reactions */
+    // Injected Reactions //
     void ProcessInjectedReactions();
     void BringSignalLogs();
     Bool_t LoadSignalLogs();
-    void ClearSignalLogs();
-    void ClearInjectedBranches();
 
    private:
-    /* Settings ~ stored in Analysis Manager ~ all persistent */
+    // Settings ~ stored in Analysis Manager ~ all persistent //
     Bool_t fIsMC;        // kTRUE if MC simulation, kFALSE if data
     Bool_t fIsSignalMC;  // kTRUE to read and load signal logs
 
-    /* AliRoot Objects */
+    // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
     const AliVVertex* fMC_PrimaryVertex;  //! MC gen. (or true) primary vertex
     AliESDEvent* fESD;                    //! reconstructed event
@@ -113,38 +110,39 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     AliPIDResponse* fPIDResponse;         //! pid response object
     AliEventCuts fEventCuts;              //! event cuts
 
-    UInt_t fRunNumber;       //! run number
-    UInt_t fDirNumber;       //! directory number
-    UInt_t fDirNumberB;      //! component after-the-dot of data directories
-    UInt_t fEventNumber;     //! event number
-    Float_t fCentrality;     //! centrality percentile
-    Float_t fMagneticField;  //! magnetic field
+    UInt_t fRunNumber;          //! run number
+    UInt_t fDirNumber;          //! directory number
+    UInt_t fDirNumberB;         //! component after-the-dot of data directories
+    UInt_t fEventNumberInFile;  //! event number
+    Float_t fCentrality;        //! centrality percentile
+    Float_t fMagneticField;     //! magnetic field
 
-    /* Signal Logs */
+    // Signal Logs //
     TString fAliEnPath;              //! loaded in `UserNotify()`
     TString fSignalLog_NewBasename;  //!
 
-    /* Utilities */
-    std::unordered_map<Int_t, Long_t> fMcEntry_;                      //! key: mc_idx
-    std::unordered_map<UInt_t, std::vector<UInt_t>> fReactionID_;     //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Px_;  //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Py_;  //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fSexaquark_Pz_;  //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Px_;    //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Py_;    //! key: event_n
-    std::unordered_map<UInt_t, std::vector<Float_t>> fNucleon_Pz_;    //! key: event_n
+    // Utilities //
+    std::vector<Long_t> fVec_McEntry;                          //!
+    std::vector<int> ToRealEventNumber;                        //!
+    std::vector<std::vector<unsigned int>> fEvVec_ReactionID;  //!
+    std::vector<std::vector<float>> fEvVec_Sexaquark_Px;       //!
+    std::vector<std::vector<float>> fEvVec_Sexaquark_Py;       //!
+    std::vector<std::vector<float>> fEvVec_Sexaquark_Pz;       //!
+    std::vector<std::vector<float>> fEvVec_Nucleon_Px;         //!
+    std::vector<std::vector<float>> fEvVec_Nucleon_Py;         //!
+    std::vector<std::vector<float>> fEvVec_Nucleon_Pz;         //!
 
-    /* Output */
+    // Output //
 
-    /** QA Histograms **/
+    // QA Histograms //
     TList* fOutputList;              //!
     TH1F* fHist_Events_Bookkeeping;  //!
     TH1F* fHist_Centrality;          //!
     TH1F* fHist_CentralityINT7;      //!
 
-    /** Trees **/
+    // Trees //
     TTree* fOutputTree;  //!
-    /* -- Event properties */
+    // -- Event properties //
     Float_t tEvent_PV_TrueXv;                    //!
     Float_t tEvent_PV_TrueYv;                    //!
     Float_t tEvent_PV_TrueZv;                    //!
@@ -165,15 +163,15 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     Bool_t tEvent_IsHighMultSPD;                 //!
     Bool_t tEvent_IsCentral;                     //!
     Bool_t tEvent_IsSemiCentral;                 //!
-    /* -- Signal reaction properties */
-    std::vector<UInt_t> tInjected_ReactionID;   //!
-    std::vector<Float_t> tInjected_Px;          //!
-    std::vector<Float_t> tInjected_Py;          //!
-    std::vector<Float_t> tInjected_Pz;          //!
-    std::vector<Float_t> tInjected_Nucleon_Px;  //!
-    std::vector<Float_t> tInjected_Nucleon_Py;  //!
-    std::vector<Float_t> tInjected_Nucleon_Pz;  //!
-    /* -- MC particles properties */
+    // -- Signal reaction properties //
+    std::vector<unsigned int> tInjected_ReactionID;  //!
+    std::vector<float> tInjected_Px;                 //!
+    std::vector<float> tInjected_Py;                 //!
+    std::vector<float> tInjected_Pz;                 //!
+    std::vector<float> tInjected_Nucleon_Px;         //!
+    std::vector<float> tInjected_Nucleon_Py;         //!
+    std::vector<float> tInjected_Nucleon_Pz;         //!
+    // -- MC particles properties //
     std::vector<Int_t> tMC_PdgCode;          //!
     std::vector<Long_t> tMC_Mother_McEntry;  //!
     std::vector<Float_t> tMC_Px;             //!
@@ -188,17 +186,18 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     std::vector<Bool_t> tMC_IsPrimary;       //!
     std::vector<Bool_t> tMC_IsSecFromMat;    //!
     std::vector<Bool_t> tMC_IsSecFromWeak;   //!
-    /* -- Tracks properties */
+    // -- Tracks properties //
 #if WRITE_ESD_INDICES
     std::vector<Long_t> tTrack_EsdIdx;  //! DEBUG
 #endif
-    std::vector<Float_t> tTrack_Px;                //! inner parametrization
-    std::vector<Float_t> tTrack_Py;                //! inner parametrization
-    std::vector<Float_t> tTrack_Pz;                //! inner parametrization
-    std::vector<Float_t> tTrack_X;                 //!
-    std::vector<Float_t> tTrack_Y;                 //!
-    std::vector<Float_t> tTrack_Z;                 //!
-    std::vector<Int_t> tTrack_Charge;              //!
+    std::vector<Float_t> tTrack_Px;    //! inner parametrization
+    std::vector<Float_t> tTrack_Py;    //! inner parametrization
+    std::vector<Float_t> tTrack_Pz;    //! inner parametrization
+    std::vector<Float_t> tTrack_X;     //!
+    std::vector<Float_t> tTrack_Y;     //!
+    std::vector<Float_t> tTrack_Z;     //!
+    std::vector<Int_t> tTrack_Charge;  //!
+#if INCLUDE_MUCH_INFO
     std::vector<Float_t> tTrack_Alpha;             //!
     std::vector<Float_t> tTrack_Snp;               //! local sine of the track momentum azimuthal angle
     std::vector<Float_t> tTrack_Tgl;               //! tangent of the track momentum dip angle
@@ -228,26 +227,14 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     std::vector<UInt_t> tTrack_NFindableClusters;  //!
     std::vector<UInt_t> tTrack_NSharedClusters;    //!
     std::vector<Float_t> tTrack_Chi2overNcls;      //!
-    std::vector<Bool_t> tTrack_IsKinkDaughter;     //!
+#endif
+    std::vector<Bool_t> tTrack_IsKinkDaughter;  //!
     // TBits tTrack_TPCFitMap;             //!
     // TBits tTrack_TPCClusterMap;         //!
     // TBits tTrack_TPCSharedMap;          //!
     std::vector<ULong_t> tTrack_McEntry;  //!
 
-    /*** Cuts ~ persistent, because they are set on `Initialize()` ***/
-    Float_t kMax_NSigma_Pion;                //
-    Float_t kMax_NSigma_Kaon;                //
-    Float_t kMax_NSigma_Proton;              //
-    Float_t kMax_Track_Eta;                  //
-    Float_t kMin_Track_NTPCClusters;         //
-    Float_t kMax_Track_Chi2PerNTPCClusters;  //
-    Bool_t kTurnedOn_Track_StatusCuts;       //
-    Bool_t kTurnedOn_Track_RejectKinks;      //
-    Float_t kMin_Track_DCA_wrtPV;            //
-    Float_t kMin_Track_DCAxy_wrtPV;          //
-    Float_t kMin_Track_DCAz_wrtPV;           //
-
     ClassDef(AliAnalysisTaskEsd2Tree, 13);  // = number of persistent members
 };
 
-#endif  // ALIANALYSISTASKESD2TREE_H
+#endif  // E2V_TASK_H
