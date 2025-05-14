@@ -11,21 +11,21 @@
 #include "AliMultSelectionTask.h"
 #include "AliPhysicsSelectionTask.h"
 
-#include "AliAnalysisTaskEsd2Tree.h"
+#include "AliAnalysisTaskEsd2Vector.h"
 
 void runAnalysis(const TString &Mode,            // "local", "grid"
                  const TString &InputPath,       // what comes before the RN
                  const TString &ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
                                                  // for signal MC: "LHC23l1a3", "LHC23l1b3"
                                                  // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
-                 Int_t RunNumber,                // single run number
+                 int RunNumber,                  // single run number
                  /* only valid when Mode == "local" */
-                 Int_t Local_NDirs = 1,           // for MC: number of subdirs per run, data doesn't use it
-                 Int_t Local_LimitToNEvents = 0,  // 0 means all events
+                 int Local_NDirs = 1,                 // for MC: number of subdirs per run, data doesn't use it
+                 long long Local_LimitToNEvents = 0,  // 0 means all events
                  /* only valid when Mode == "grid" */
-                 Bool_t Grid_TestMode = false,               //
+                 bool Grid_TestMode = false,                 //
                  const TString &Grid_WorkingDir = "",        //
-                 Int_t Grid_CustomSplitMaxNFiles = 0,        // 0 means default
+                 int Grid_CustomSplitMaxNFiles = 0,          // 0 means default
                  const TString &Grid_CustomDataPattern = ""  // what comes after the RN, empty means default
 ) {
 
@@ -48,18 +48,18 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     /* Determine Further Options */
 
-    Bool_t IsMC = ProductionName.Contains("LHC2");
-    Bool_t IsSignalMC = ProductionName.Contains("23l1");
+    bool IsMC{ProductionName.Contains("LHC2")};
+    bool IsSignalMC{ProductionName.Contains("23l1")};
 
-    Int_t SplitMaxNFiles = 60;      // default for data
+    int SplitMaxNFiles{60};         // default for data
     if (IsMC) SplitMaxNFiles = 10;  // default for MC
     if (Grid_CustomSplitMaxNFiles > 0) SplitMaxNFiles = Grid_CustomSplitMaxNFiles;
 
-    Int_t PassNumber = 3;  // default for 18qr and anchored sims
+    int PassNumber{3};  // default for 18qr and anchored sims
     if (ProductionName == "LHC15o" || ProductionName == "LHC20j6a" || ProductionName == "LHC23l1b3") PassNumber = 2;
 
-    TString GridDataPattern = TString::Format("/pass%i/*/AliESDs.root", PassNumber);  // default for data
-    if (IsMC) GridDataPattern = "/*/AliESDs.root";                                    // default for MC
+    TString GridDataPattern{TString::Format("/pass%i/*/AliESDs.root", PassNumber)};  // default for data
+    if (IsMC) GridDataPattern = "/*/AliESDs.root";                                   // default for MC
     if (Grid_CustomDataPattern.Length() > 0) GridDataPattern = Grid_CustomDataPattern;
 
     /* Start */
@@ -68,20 +68,20 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
     gInterpreter->ProcessLine(".include $ALICE_ROOT/include");
     gInterpreter->ProcessLine(".include $ALICE_PHYSICS/include");
 
-    AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Tree");
+    AliAnalysisManager *mgr{new AliAnalysisManager("Esd2Vector")};
 
     std::cout << "!! INFO  !! runAnalysis.C !! Created AliAnalysisManager" << '\n';
 
     /* Grid Connection */
 
-    AliAnalysisAlien *alienHandler = nullptr;
+    AliAnalysisAlien *alienHandler{nullptr};
 
     if (Mode == "grid") {
         alienHandler = new AliAnalysisAlien();
-        alienHandler->SetCheckCopy(kFALSE);
+        alienHandler->SetCheckCopy(false);
         alienHandler->AddIncludePath("-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include");
-        alienHandler->SetAdditionalLibs("AliAnalysisTaskEsd2Tree.cxx AliAnalysisTaskEsd2Tree.h AliAnalysisTaskEsd2Vector_Const.h");
-        alienHandler->SetAnalysisSource("AliAnalysisTaskEsd2Tree.cxx");
+        alienHandler->SetAdditionalLibs("AliAnalysisTaskEsd2Vector.cxx AliAnalysisTaskEsd2Vector.h AliAnalysisTaskEsd2Vector_Const.h");
+        alienHandler->SetAnalysisSource("AliAnalysisTaskEsd2Vector.cxx");
         alienHandler->SetAliPhysicsVersion("vAN-20241126_O2-1");
         alienHandler->SetExecutableCommand("aliroot -l -q -b");
         alienHandler->SetGridDataDir(InputPath);
@@ -89,15 +89,15 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         alienHandler->AddRunNumber(RunNumber);
         alienHandler->SetDataPattern(GridDataPattern);
         alienHandler->SetTTL(3600);
-        alienHandler->SetOutputToRunNo(static_cast<Int_t>(kTRUE));
-        alienHandler->SetDefaultOutputs(kFALSE);
+        alienHandler->SetOutputToRunNo(static_cast<int>(true));
+        alienHandler->SetDefaultOutputs(false);
         alienHandler->SetOutputFiles("AnalysisResults.root");
         alienHandler->SetOutputArchive("");
-        alienHandler->SetKeepLogs(kTRUE);
-        alienHandler->SetMergeViaJDL(kFALSE);
+        alienHandler->SetKeepLogs(true);
+        alienHandler->SetMergeViaJDL(false);
         alienHandler->SetGridWorkingDir(Grid_WorkingDir);
-        alienHandler->SetJDLName("TaskEsd2Tree.jdl");
-        alienHandler->SetExecutable("TaskEsd2Tree.sh");
+        alienHandler->SetJDLName("TaskEsd2Vector.jdl");
+        alienHandler->SetExecutable("TaskEsd2Vector.sh");
 
         mgr->SetGridHandler(alienHandler);
 
@@ -106,14 +106,14 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     /* Input Handlers */
 
-    AliESDInputHandler *esdH = new AliESDInputHandler();
+    AliESDInputHandler *esdH{new AliESDInputHandler()};
     esdH->SetNeedField();  // necessary to get GoldenChi2
     mgr->SetInputEventHandler(esdH);
 
-    AliMCEventHandler *mcH = nullptr;
+    AliMCEventHandler *mcH{nullptr};
     if (IsMC) {
         mcH = new AliMCEventHandler();
-        mcH->SetReadTR(kFALSE);
+        mcH->SetReadTR(false);
         mgr->SetMCtruthEventHandler(mcH);
     }
 
@@ -121,32 +121,36 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     /* Add Helper Tasks */
 
-    Bool_t applyPileupCuts = kFALSE;  // kFALSE in Pb-Pb (as recommended in: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel)
-    TString TaskPhysicsSelection_Options = TString::Format("(%i, %i)", (Int_t)IsMC, (Int_t)applyPileupCuts);
-    AliPhysicsSelectionTask *TaskPhysicsSelection = reinterpret_cast<AliPhysicsSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options));
+    bool applyPileupCuts{false};  // false in Pb-Pb (as recommended in: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel)
+    TString TaskPhysicsSelection_Options{TString::Format("(%i, %i)", (int)IsMC, (int)applyPileupCuts)};
+    AliPhysicsSelectionTask *TaskPhysicsSelection{reinterpret_cast<AliPhysicsSelectionTask *>(
+        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options)  //
+        )};
     if (TaskPhysicsSelection == nullptr) return;
 
-    TString TaskCentrality_Options = "";  // nothing
-    AliMultSelectionTask *TaskCentrality = reinterpret_cast<AliMultSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options));
+    TString TaskCentrality_Options{""};  // nothing
+    AliMultSelectionTask *TaskCentrality{reinterpret_cast<AliMultSelectionTask *>(
+        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options)  //
+        )};
     if (TaskCentrality == nullptr) return;
 
-    TString TaskPIDResponse_Options = TString::Format("(%i, 1, 1, \"%i\")", (Int_t)IsMC, PassNumber);
-    AliAnalysisTaskPIDResponse *TaskPIDResponse = reinterpret_cast<AliAnalysisTaskPIDResponse *>(
-        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
+    TString TaskPIDResponse_Options{TString::Format("(%i, 1, 1, \"%i\")", (int)IsMC, PassNumber)};
+    AliAnalysisTaskPIDResponse *TaskPIDResponse{reinterpret_cast<AliAnalysisTaskPIDResponse *>(
+        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options)  //
+        )};
     if (TaskPIDResponse == nullptr) return;
 
     std::cout << "!! INFO  !! runAnalysis.C !! Passed addition of helper tasks" << '\n';
 
     /* Add Main Task */
 
-    gInterpreter->LoadMacro("AliAnalysisTaskEsd2Tree.cxx++g");
+    gInterpreter->LoadMacro("AliAnalysisTaskEsd2Vector.cxx++g");
 
-    TString TaskEsd2Tree_Options = TString::Format("(%i, %i)", (Int_t)IsMC, (Int_t)IsSignalMC);
-    AliAnalysisTaskEsd2Tree *TaskEsd2Tree =
-        reinterpret_cast<AliAnalysisTaskEsd2Tree *>(gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
-    if (TaskEsd2Tree == nullptr) return;
+    TString TaskEsd2Vector_Options{TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC)};
+    AliAnalysisTaskEsd2Vector *TaskEsd2Vector{reinterpret_cast<AliAnalysisTaskEsd2Vector *>(  //
+        gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options)            //
+        )};
+    if (TaskEsd2Vector == nullptr) return;
 
     std::cout << "!! INFO  !! runAnalysis.C !! Passed addition of main task" << '\n';
 
@@ -159,8 +163,8 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     /* Start Analysis */
 
-    TChain *chain = nullptr;
-    TString FilePath = "";
+    TChain *chain{nullptr};
+    TString FilePath{""};
 
     if (Mode == "grid") {
         if (Grid_TestMode) {
@@ -174,16 +178,16 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
     } else {  // local mode
         chain = new TChain("esdTree");
         if (IsMC) {
-            for (Int_t DN = 1; DN <= Local_NDirs; DN++) {
+            for (int DN{1}; DN <= Local_NDirs; ++DN) {
                 FilePath = TString::Format("%s/%i/%03i/AliESDs.root", InputPath.Data(), RunNumber, DN);
                 std::cout << "!! INFO  !! runAnalysis.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }
         } else {  // data
-            TString top_path = TString::Format("%s/000%i/pass%i", InputPath.Data(), RunNumber, PassNumber);
+            TString top_path{TString::Format("%s/000%i/pass%i", InputPath.Data(), RunNumber, PassNumber)};
             TSystemDirectory top_dir(top_path, top_path);
             for (auto *file : *top_dir.GetListOfFiles()) {
-                auto *one_dir = dynamic_cast<TSystemDirectory *>(file);
+                auto *one_dir{dynamic_cast<TSystemDirectory *>(file)};
                 if (strcmp(one_dir->GetName(), ".") == 0 || strcmp(one_dir->GetName(), "..") == 0) continue;
                 if (!one_dir->IsDirectory()) continue;
                 FilePath = TString::Format("%s/%s/AliESDs.root", top_path.Data(), one_dir->GetName());
@@ -195,7 +199,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         if (Local_LimitToNEvents == 0)
             mgr->StartAnalysis("local", chain);  // read all events
         else
-            mgr->StartAnalysis("local", chain, (Long64_t)Local_LimitToNEvents);  // read first NEvents
+            mgr->StartAnalysis("local", chain, Local_LimitToNEvents);  // read first NEvents
     }
 
     std::cout << "!! INFO  !! runAnalysis.C !! Passed StartAnalysis" << '\n';

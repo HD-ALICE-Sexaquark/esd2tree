@@ -51,14 +51,14 @@
 
 class AliPIDResponse;
 
-class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
+class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
    public:
-    AliAnalysisTaskEsd2Tree();
-    AliAnalysisTaskEsd2Tree(const char* name);
-    ~AliAnalysisTaskEsd2Tree();
+    AliAnalysisTaskEsd2Vector();
+    AliAnalysisTaskEsd2Vector(const char* name);
+    ~AliAnalysisTaskEsd2Vector();
 
-    AliAnalysisTaskEsd2Tree(const AliAnalysisTaskEsd2Tree&);
-    AliAnalysisTaskEsd2Tree& operator=(const AliAnalysisTaskEsd2Tree&);
+    AliAnalysisTaskEsd2Vector(const AliAnalysisTaskEsd2Vector&);
+    AliAnalysisTaskEsd2Vector& operator=(const AliAnalysisTaskEsd2Vector&);
 
     // Settings ~ stored in Analysis Manager //
     void Initialize(bool is_mc, bool is_signal_mc = false);
@@ -231,7 +231,7 @@ class AliAnalysisTaskEsd2Tree : public AliAnalysisTaskSE {
     // TBits tTrack_TPCClusterMap;         //!
     // TBits tTrack_TPCSharedMap;          //!
 
-    ClassDef(AliAnalysisTaskEsd2Tree, 13);  // = number of persistent members
+    ClassDef(AliAnalysisTaskEsd2Vector, 13);  // = number of persistent members
 };
 
 #endif  // E2V_TASK_H

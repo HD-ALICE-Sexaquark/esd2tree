@@ -1,12 +1,12 @@
 #include "AliAnalysisManager.h"
-#include "AliAnalysisTaskEsd2Tree.h"
+#include "AliAnalysisTaskEsd2Vector.h"
 
-AliAnalysisTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_signal_mc) {
+AliAnalysisTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
 
     AliAnalysisManager *mgr{AliAnalysisManager::GetAnalysisManager()};
     if (mgr == nullptr) return nullptr;
 
-    auto *task{new AliAnalysisTaskEsd2Tree("AliAnalysisTaskEsd2Tree")};
+    auto *task{new AliAnalysisTaskEsd2Vector("AliAnalysisTaskEsd2Vector")};
     if (task == nullptr) return nullptr;
 
     task->SelectCollisionCandidates(AliVEvent::kINT7);  // from `AliPhysicsSelectionTask`

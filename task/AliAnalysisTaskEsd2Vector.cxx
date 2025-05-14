@@ -1,13 +1,13 @@
 #include <sstream>
 #include <string>
 
-#include "AliAnalysisTaskEsd2Tree.h"
+#include "AliAnalysisTaskEsd2Vector.h"
 #include "AliAnalysisTaskEsd2Vector_Const.h"
 
-ClassImp(AliAnalysisTaskEsd2Tree);
+ClassImp(AliAnalysisTaskEsd2Vector);
 
 // Empty I/O constructor. Non-persistent members are initialized to their default values from here.
-AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
+AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector()
     : AliAnalysisTaskSE(""),
       /*  */
       fIsMC(false),
@@ -137,7 +137,7 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree()
 }
 
 // Constructor, called locally.
-AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
+AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector(const char* name)
     : AliAnalysisTaskSE(name),
       /*  */
       fIsMC(false),
@@ -271,13 +271,13 @@ AliAnalysisTaskEsd2Tree::AliAnalysisTaskEsd2Tree(const char* name)
 
 // Destructor.
 // Note: if `TList::SetOwner(kTRUE)` was called, the TList destructor should delete all objects added to it.
-AliAnalysisTaskEsd2Tree::~AliAnalysisTaskEsd2Tree() {
+AliAnalysisTaskEsd2Vector::~AliAnalysisTaskEsd2Vector() {
     delete fOutputList;
     delete fOutputTree;
 }
 
-// Initialize analysis task. Needs to be called within an `AddTaskEsd2Tree.C` macro.
-void AliAnalysisTaskEsd2Tree::Initialize(bool is_mc, bool is_signal_mc) {
+// Initialize analysis task. Needs to be called within an `AddTaskEsd2Vector.C` macro.
+void AliAnalysisTaskEsd2Vector::Initialize(bool is_mc, bool is_signal_mc) {
 
     fIsMC = is_mc;
     fIsSignalMC = is_signal_mc;
@@ -294,7 +294,7 @@ void AliAnalysisTaskEsd2Tree::Initialize(bool is_mc, bool is_signal_mc) {
 // Executed at runtime //
 
 // Create output objects, called once at RUNTIME ~ execution on Grid.
-void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
+void AliAnalysisTaskEsd2Vector::UserCreateOutputObjects() {
 
     auto* man{AliAnalysisManager::GetAnalysisManager()};
     if (man == nullptr) AliFatal("ERROR: AliAnalysisManager couldn't be found.");
@@ -340,7 +340,7 @@ void AliAnalysisTaskEsd2Tree::UserCreateOutputObjects() {
 // User implementation of `Notify()`. Needed for reading the AliEn path.
 // This function is loaded during `AliAnalysisManager::Notify()`.
 // It's called after `UserCreateOutputObjects()`, for each new file, and before the first `UserExec()`.
-Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
+Bool_t AliAnalysisTaskEsd2Vector::UserNotify() {
 
     auto* man{AliAnalysisManager::GetAnalysisManager()};
     if (man == nullptr) AliFatal("Analysis Manager not found");
@@ -378,7 +378,7 @@ Bool_t AliAnalysisTaskEsd2Tree::UserNotify() {
 }
 
 // Main function, called per each event at RUNTIME ~ execution on Grid.
-void AliAnalysisTaskEsd2Tree::UserExec(Option_t* option) {
+void AliAnalysisTaskEsd2Vector::UserExec(Option_t* option) {
     // events //
     if (!ProcessEvent()) return;
     // mc particles //
@@ -402,7 +402,7 @@ void AliAnalysisTaskEsd2Tree::UserExec(Option_t* option) {
 
 // # Events //
 
-bool AliAnalysisTaskEsd2Tree::ProcessEvent() {
+bool AliAnalysisTaskEsd2Vector::ProcessEvent() {
     // Load MC Event //
     if (fIsMC) {
         fMC = MCEvent();
@@ -467,7 +467,7 @@ bool AliAnalysisTaskEsd2Tree::ProcessEvent() {
 }
 
 // Apply event selection.
-bool AliAnalysisTaskEsd2Tree::PassesEventSelection() {
+bool AliAnalysisTaskEsd2Vector::PassesEventSelection() {
 
     fHist_Events_Bookkeeping->Fill(0.);
     if (!fEventCuts.AcceptEvent(fESD)) return false;
@@ -507,7 +507,7 @@ bool AliAnalysisTaskEsd2Tree::PassesEventSelection() {
 // # Trees //
 
 // Add branches to `fOutputTree`.
-void AliAnalysisTaskEsd2Tree::CreateEventsBranches() {
+void AliAnalysisTaskEsd2Vector::CreateEventsBranches() {
     fOutputTree->Branch("RunNumber", &fRunNumber, "RunNumber/i");
     fOutputTree->Branch("DirNumber", &fDirNumber, "DirNumber/i");
     if (!fIsMC) fOutputTree->Branch("DirNumberB", &fDirNumberB, "DirNumberB/i");
@@ -539,7 +539,7 @@ void AliAnalysisTaskEsd2Tree::CreateEventsBranches() {
 }
 
 // Add branches to `fTree_Injected`.
-void AliAnalysisTaskEsd2Tree::CreateInjectedBranches() {
+void AliAnalysisTaskEsd2Vector::CreateInjectedBranches() {
     fOutputTree->Branch("ReactionID", &tInjected_ReactionID);
     fOutputTree->Branch("Sexaquark_Px", &tInjected_Px);
     fOutputTree->Branch("Sexaquark_Py", &tInjected_Py);
@@ -550,7 +550,7 @@ void AliAnalysisTaskEsd2Tree::CreateInjectedBranches() {
 }
 
 // Add branches to `fTree_MC`.
-void AliAnalysisTaskEsd2Tree::CreateMCBranches() {
+void AliAnalysisTaskEsd2Vector::CreateMCBranches() {
     fOutputTree->Branch("MC_PdgCode", &tMC_PdgCode);
     fOutputTree->Branch("MC_Mother_McEntry", &tMC_Mother_McEntry);
     fOutputTree->Branch("MC_Px", &tMC_Px);
@@ -568,7 +568,7 @@ void AliAnalysisTaskEsd2Tree::CreateMCBranches() {
 }
 
 // Add branches to `fTree_Tracks`.
-void AliAnalysisTaskEsd2Tree::CreateTracksBranches() {
+void AliAnalysisTaskEsd2Vector::CreateTracksBranches() {
 #if WRITE_ESD_INDICES
     fOutputTree->Branch("Track_EsdIdx", &tTrack_EsdIdx);
 #endif
@@ -620,7 +620,7 @@ void AliAnalysisTaskEsd2Tree::CreateTracksBranches() {
 // # MC Generated //
 
 // Loop over MC particles in a single event.
-void AliAnalysisTaskEsd2Tree::ProcessMCParticles() {
+void AliAnalysisTaskEsd2Vector::ProcessMCParticles() {
     // prepare vectors
     const int n_mc{fMC->GetNumberOfTracks()};
     fVec_McEntry.resize(n_mc, -1);
@@ -666,7 +666,7 @@ void AliAnalysisTaskEsd2Tree::ProcessMCParticles() {
 }
 
 // Clear MC branches.
-void AliAnalysisTaskEsd2Tree::ClearMCBranches() {
+void AliAnalysisTaskEsd2Vector::ClearMCBranches() {
     tMC_PdgCode.clear();
     tMC_Mother_McEntry.clear();
     tMC_Px.clear();
@@ -686,7 +686,7 @@ void AliAnalysisTaskEsd2Tree::ClearMCBranches() {
 // # Reconstructed //
 
 // Loop over the reconstructed tracks in a single event.
-void AliAnalysisTaskEsd2Tree::ProcessTracks() {
+void AliAnalysisTaskEsd2Vector::ProcessTracks() {
 
     for (auto esd_idx{0}; esd_idx < fESD->GetNumberOfTracks(); ++esd_idx) {
         auto* track{fESD->GetTrack(esd_idx)};
@@ -754,7 +754,7 @@ void AliAnalysisTaskEsd2Tree::ProcessTracks() {
 }
 
 // Check if track passes selection and fill bookkeeping histograms.
-bool AliAnalysisTaskEsd2Tree::PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param) {
+bool AliAnalysisTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param) {
 
     bool its_status{((track->GetStatus() & AliESDtrack::kITSin) == 0U) && ((track->GetStatus() & AliESDtrack::kITSout) == 0U) &&
                     ((track->GetStatus() & AliESDtrack::kITSrefit) == 0U)};
@@ -800,7 +800,7 @@ bool AliAnalysisTaskEsd2Tree::PassesTrackSelection(const AliESDtrack* track, con
 }
 
 // Clear the branches of the reconstructed tracks.
-void AliAnalysisTaskEsd2Tree::ClearTracksBranches() {
+void AliAnalysisTaskEsd2Vector::ClearTracksBranches() {
 #if WRITE_ESD_INDICES
     tTrack_EsdIdx.clear();
 #endif
@@ -852,7 +852,7 @@ void AliAnalysisTaskEsd2Tree::ClearTracksBranches() {
 // # Injected Reactions //
 
 // Assign the in-memory values to the tree branches.
-void AliAnalysisTaskEsd2Tree::ProcessInjectedReactions() {
+void AliAnalysisTaskEsd2Vector::ProcessInjectedReactions() {
     tInjected_ReactionID = fEvVec_ReactionID[fEventNumberInFile];
     tInjected_Px = fEvVec_Sexaquark_Px[fEventNumberInFile];
     tInjected_Py = fEvVec_Sexaquark_Py[fEventNumberInFile];
@@ -864,7 +864,7 @@ void AliAnalysisTaskEsd2Tree::ProcessInjectedReactions() {
 
 // Open the respective `sim.log` that corresponds to the `RunNumber+DirNumber` that's being analyzed.
 // From it, read the injected anti-sexaquark and struck nucleon kinematics and store them into a tree.
-void AliAnalysisTaskEsd2Tree::BringSignalLogs() {
+void AliAnalysisTaskEsd2Vector::BringSignalLogs() {
 
     TGrid* alien = nullptr;
     if (gGrid == nullptr) {
@@ -897,7 +897,7 @@ void AliAnalysisTaskEsd2Tree::BringSignalLogs() {
 
 // Load injected anti-sexaquark and struck nucleon info.
 // From the `sim.log` file that corresponds to an entire dir number into memory.
-Bool_t AliAnalysisTaskEsd2Tree::LoadSignalLogs() {
+Bool_t AliAnalysisTaskEsd2Vector::LoadSignalLogs() {
 
     TString new_path = Form("%s/%s", gSystem->pwd(), fSignalLog_NewBasename.Data());
     AliInfoF("Opening file %s ...", new_path.Data());
