@@ -21,11 +21,8 @@
 #include "TSystem.h"
 #include "TTree.h"
 
-#ifndef ALIANALYSISTASKSE_H
-#include "AliAnalysisTaskSE.h"
-#endif
-
 #include "AliAnalysisManager.h"
+#include "AliAnalysisTaskSE.h"
 #include "AliExternalTrackParam.h"
 #include "AliHelix.h"
 #include "AliInputEventHandler.h"
@@ -106,19 +103,19 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     AliPIDResponse* fPIDResponse;         //! pid response object
     AliEventCuts fEventCuts;              //! event cuts
 
-    UInt_t fRunNumber;          //! run number
-    UInt_t fDirNumber;          //! directory number
-    UInt_t fDirNumberB;         //! component after-the-dot of data directories
-    UInt_t fEventNumberInFile;  //! event number
-    Float_t fCentrality;        //! centrality percentile
-    Float_t fMagneticField;     //! magnetic field
+    unsigned int fRunNumber;          //! run number
+    unsigned int fDirNumber;          //! directory number
+    unsigned int fDirNumberB;         //! component after-the-dot of data directories
+    unsigned int fEventNumberInFile;  //! event number
+    float fCentrality;                //! centrality percentile
+    float fMagneticField;             //! magnetic field
 
     // Signal Logs //
     TString fAliEnPath;              //! loaded in `UserNotify()`
     TString fSignalLog_NewBasename;  //!
 
     // Utilities //
-    std::vector<Long_t> fVec_McEntry;                          //!
+    std::vector<long> fVec_McEntry;                            //!
     std::vector<int> ToRealEventNumber;                        //!
     std::vector<std::vector<unsigned int>> fEvVec_ReactionID;  //!
     std::vector<std::vector<float>> fEvVec_Sexaquark_Px;       //!
@@ -128,7 +125,7 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     std::vector<std::vector<float>> fEvVec_Nucleon_Py;         //!
     std::vector<std::vector<float>> fEvVec_Nucleon_Pz;         //!
 
-    // Output //
+    // # Output //
 
     // QA Histograms //
     TList* fOutputList;              //!
@@ -140,26 +137,26 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     // Trees //
     TTree* fOutputTree;  //!
     // -- Event properties //
-    Float_t tEvent_PV_TrueXv;                    //!
-    Float_t tEvent_PV_TrueYv;                    //!
-    Float_t tEvent_PV_TrueZv;                    //!
-    Bool_t tEvent_IsGenPileup;                   //!
-    Bool_t tEvent_IsSBCPileup;                   //!
-    Int_t tEvent_PV_NContributors;               //!
-    Float_t tEvent_PV_Dispersion;                //!
-    Float_t tEvent_PV_Xv;                        //!
-    Float_t tEvent_PV_Yv;                        //!
-    Float_t tEvent_PV_Zv;                        //!
-    std::array<Float_t, 6> tEvent_PV_CovMatrix;  //!
-    Float_t tEvent_SPD_PV_Zv;                    //!
-    Float_t tEvent_SPD_PV_ZvErr;                 //!
-    UInt_t tEvent_NTracks;                       //!
-    Int_t tEvent_NTPCClusters;                   //!
-    Bool_t tEvent_IsMB;                          //!
-    Bool_t tEvent_IsHighMultV0;                  //!
-    Bool_t tEvent_IsHighMultSPD;                 //!
-    Bool_t tEvent_IsCentral;                     //!
-    Bool_t tEvent_IsSemiCentral;                 //!
+    float tEvent_PV_TrueXv;                    //!
+    float tEvent_PV_TrueYv;                    //!
+    float tEvent_PV_TrueZv;                    //!
+    bool tEvent_IsGenPileup;                   //!
+    bool tEvent_IsSBCPileup;                   //!
+    int tEvent_PV_NContributors;               //!
+    float tEvent_PV_Dispersion;                //!
+    float tEvent_PV_Xv;                        //!
+    float tEvent_PV_Yv;                        //!
+    float tEvent_PV_Zv;                        //!
+    std::array<float, 6> tEvent_PV_CovMatrix;  //!
+    float tEvent_SPD_PV_Zv;                    //!
+    float tEvent_SPD_PV_ZvErr;                 //!
+    unsigned int tEvent_NTracks;               //!
+    int tEvent_NTPCClusters;                   //!
+    bool tEvent_IsMB;                          //!
+    bool tEvent_IsHighMultV0;                  //!
+    bool tEvent_IsHighMultSPD;                 //!
+    bool tEvent_IsCentral;                     //!
+    bool tEvent_IsSemiCentral;                 //!
     // -- Signal reaction properties //
     std::vector<unsigned int> tInjected_ReactionID;  //!
     std::vector<float> tInjected_Px;                 //!
@@ -169,69 +166,71 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     std::vector<float> tInjected_Nucleon_Py;         //!
     std::vector<float> tInjected_Nucleon_Pz;         //!
     // -- MC particles properties //
-    std::vector<Int_t> tMC_PdgCode;          //!
-    std::vector<Long_t> tMC_Mother_McEntry;  //!
-    std::vector<Float_t> tMC_Px;             //!
-    std::vector<Float_t> tMC_Py;             //!
-    std::vector<Float_t> tMC_Pz;             //!
-    std::vector<Float_t> tMC_Xv;             //! origin x-vertex
-    std::vector<Float_t> tMC_Yv;             //! origin y-vertex
-    std::vector<Float_t> tMC_Zv;             //! origin z-vertex
-    std::vector<UInt_t> tMC_Status;          //!
-    std::vector<Bool_t> tMC_IsOOBPileup;     //!
-    std::vector<Int_t> tMC_Generator;        //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
-    std::vector<Bool_t> tMC_IsPrimary;       //!
-    std::vector<Bool_t> tMC_IsSecFromMat;    //!
-    std::vector<Bool_t> tMC_IsSecFromWeak;   //!
+    std::vector<int> tMC_PdgCode;          //!
+    std::vector<long> tMC_Mother_McEntry;  //!
+    std::vector<float> tMC_Px;             //!
+    std::vector<float> tMC_Py;             //!
+    std::vector<float> tMC_Pz;             //!
+    std::vector<float> tMC_E;              //!
+    std::vector<float> tMC_Xv;             //! origin x-vertex
+    std::vector<float> tMC_Yv;             //! origin y-vertex
+    std::vector<float> tMC_Zv;             //! origin z-vertex
+    std::vector<unsigned int> tMC_Status;  //!
+    std::vector<bool> tMC_IsOOBPileup;     //!
+    std::vector<int> tMC_Generator;        //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
+    std::vector<bool> tMC_IsPrimary;       //!
+    std::vector<bool> tMC_IsSecFromMat;    //!
+    std::vector<bool> tMC_IsSecFromWeak;   //!
     // -- Tracks properties //
 #if WRITE_ESD_INDICES
-    std::vector<Long_t> tTrack_EsdIdx;  //! DEBUG
+    std::vector<long> tTrack_EsdIdx;  //! DEBUG
 #endif
-    std::vector<Float_t> tTrack_Px;             //! inner parametrization
-    std::vector<Float_t> tTrack_Py;             //! inner parametrization
-    std::vector<Float_t> tTrack_Pz;             //! inner parametrization
-    std::vector<Float_t> tTrack_X;              //!
-    std::vector<Float_t> tTrack_Y;              //!
-    std::vector<Float_t> tTrack_Z;              //!
-    std::vector<Int_t> tTrack_Charge;           //!
-    std::vector<Float_t> tTrack_NSigmaPion;     //!
-    std::vector<Float_t> tTrack_NSigmaKaon;     //!
-    std::vector<Float_t> tTrack_NSigmaProton;   //!
-    std::vector<Float_t> tTrack_DCAxy;          //! pre-calculated DCA wrt PV
-    std::vector<Float_t> tTrack_DCAz;           //! pre-calculated DCA wrt PV
-    std::vector<Bool_t> tTrack_IsKinkDaughter;  //!
-    std::vector<ULong_t> tTrack_McEntry;        //!
+    std::vector<float> tTrack_Px;               //! inner parametrization
+    std::vector<float> tTrack_Py;               //! inner parametrization
+    std::vector<float> tTrack_Pz;               //! inner parametrization
+    std::vector<float> tTrack_X;                //!
+    std::vector<float> tTrack_Y;                //!
+    std::vector<float> tTrack_Z;                //!
+    std::vector<int> tTrack_Charge;             //!
+    std::vector<float> tTrack_NSigmaPion;       //!
+    std::vector<float> tTrack_NSigmaKaon;       //!
+    std::vector<float> tTrack_NSigmaProton;     //!
+    std::vector<float> tTrack_DCAxy;            //! pre-calculated DCA wrt PV
+    std::vector<float> tTrack_DCAz;             //! pre-calculated DCA wrt PV
+    std::vector<float> tTrack_SignalTPC;        //!
+    std::vector<bool> tTrack_IsKinkDaughter;    //!
+    std::vector<unsigned long> tTrack_McEntry;  //!
+    std::vector<float> tTrack_Alpha;            //!
+    std::vector<float> tTrack_Snp;              //! local sine of the track momentum azimuthal angle
+    std::vector<float> tTrack_Tgl;              //! tangent of the track momentum dip angle
+    std::vector<float> tTrack_Signed1Pt;        //! 1/pt
+    std::vector<float> tTrack_SigmaY2;          //! cov_matrix[0]
+    std::vector<float> tTrack_SigmaZY;          //! cov_matrix[1]
+    std::vector<float> tTrack_SigmaZ2;          //! cov_matrix[2]
+    std::vector<float> tTrack_SigmaSnpY;        //! cov_matrix[3]
+    std::vector<float> tTrack_SigmaSnpZ;        //! cov_matrix[4]
+    std::vector<float> tTrack_SigmaSnp2;        //! cov_matrix[5]
+    std::vector<float> tTrack_SigmaTglY;        //! cov_matrix[6]
+    std::vector<float> tTrack_SigmaTglZ;        //! cov_matrix[7]
+    std::vector<float> tTrack_SigmaTglSnp;      //! cov_matrix[8]
+    std::vector<float> tTrack_SigmaTgl2;        //! cov_matrix[9]
+    std::vector<float> tTrack_Sigma1PtY;        //! cov_matrix[10]
+    std::vector<float> tTrack_Sigma1PtZ;        //! cov_matrix[11]
+    std::vector<float> tTrack_Sigma1PtSnp;      //! cov_matrix[12]
+    std::vector<float> tTrack_Sigma1PtTgl;      //! cov_matrix[13]
+    std::vector<float> tTrack_Sigma1Pt2;        //! cov_matrix[14]
 #if INCLUDE_MUCH_INFO
-    std::vector<Float_t> tTrack_Alpha;             //!
-    std::vector<Float_t> tTrack_Snp;               //! local sine of the track momentum azimuthal angle
-    std::vector<Float_t> tTrack_Tgl;               //! tangent of the track momentum dip angle
-    std::vector<Float_t> tTrack_Signed1Pt;         //! 1/pt
-    std::vector<Float_t> tTrack_SigmaY2;           //! cov_matrix[0]
-    std::vector<Float_t> tTrack_SigmaZY;           //! cov_matrix[1]
-    std::vector<Float_t> tTrack_SigmaZ2;           //! cov_matrix[2]
-    std::vector<Float_t> tTrack_SigmaSnpY;         //! cov_matrix[3]
-    std::vector<Float_t> tTrack_SigmaSnpZ;         //! cov_matrix[4]
-    std::vector<Float_t> tTrack_SigmaSnp2;         //! cov_matrix[5]
-    std::vector<Float_t> tTrack_SigmaTglY;         //! cov_matrix[6]
-    std::vector<Float_t> tTrack_SigmaTglZ;         //! cov_matrix[7]
-    std::vector<Float_t> tTrack_SigmaTglSnp;       //! cov_matrix[8]
-    std::vector<Float_t> tTrack_SigmaTgl2;         //! cov_matrix[9]
-    std::vector<Float_t> tTrack_Sigma1PtY;         //! cov_matrix[10]
-    std::vector<Float_t> tTrack_Sigma1PtZ;         //! cov_matrix[11]
-    std::vector<Float_t> tTrack_Sigma1PtSnp;       //! cov_matrix[12]
-    std::vector<Float_t> tTrack_Sigma1PtTgl;       //! cov_matrix[13]
-    std::vector<Float_t> tTrack_Sigma1Pt2;         //! cov_matrix[14]
-    std::vector<UInt_t> tTrack_NTPCClusters;       //!
-    std::vector<Float_t> tTrack_NCrossedRows;      //!
-    std::vector<UInt_t> tTrack_NFindableClusters;  //!
-    std::vector<UInt_t> tTrack_NSharedClusters;    //!
-    std::vector<Float_t> tTrack_Chi2overNcls;      //!
+    std::vector<unsigned int> tTrack_NTPCClusters;       //!
+    std::vector<float> tTrack_NCrossedRows;              //!
+    std::vector<unsigned int> tTrack_NFindableClusters;  //!
+    std::vector<unsigned int> tTrack_NSharedClusters;    //!
+    std::vector<float> tTrack_Chi2overNcls;              //!
 #endif
     // TBits tTrack_TPCFitMap;             //!
     // TBits tTrack_TPCClusterMap;         //!
     // TBits tTrack_TPCSharedMap;          //!
 
-    ClassDef(AliAnalysisTaskEsd2Vector, 13);  // = number of persistent members
+    ClassDef(AliAnalysisTaskEsd2Vector, 2);  // = number of persistent members
 };
 
 #endif  // E2V_TASK_H
