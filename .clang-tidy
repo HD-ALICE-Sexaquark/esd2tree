@@ -19,6 +19,7 @@ Checks: "*,
   -readability-math-missing-parentheses,
   -readability-implicit-bool-conversion,
   -bugprone-easily-swappable-parameters,
+  -*-magic-numbers,
   -hicpp-braces-around-statements,
   -cppcoreguidelines-init-variables,"
 WarningsAsErrors: ""

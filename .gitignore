@@ -32,3 +32,5 @@ scripts/**/
 scripts/RN_**.txt
 scripts_mc/**/
 scripts_mc/RN_**.txt
+utilities/nevents/
+**.slurm.sh

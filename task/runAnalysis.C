@@ -1,15 +1,16 @@
-#include "Rtypes.h"
-#include "TChain.h"
-#include "TSystemDirectory.h"
+#include <TChain.h>
+#include <TString.h>
+#include <TSystemDirectory.h>
 
-#include "AliAnalysisAlien.h"
-#include "AliAnalysisManager.h"
-#include "AliESDInputHandler.h"
-#include "AliMCEventHandler.h"
+#include <AliAnalysisAlien.h>
+#include <AliAnalysisManager.h>
+#include <AliDataFile.h>
+#include <AliESDInputHandler.h>
+#include <AliMCEventHandler.h>
 
-#include "AliAnalysisTaskPIDResponse.h"
-#include "AliMultSelectionTask.h"
-#include "AliPhysicsSelectionTask.h"
+#include <AliAnalysisTaskPIDResponse.h>
+#include <AliMultSelectionTask.h>
+#include <AliPhysicsSelectionTask.h>
 
 #include "AliAnalysisTaskEsd2Vector.h"
 
@@ -121,7 +122,8 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     /* Add Helper Tasks */
 
-    bool applyPileupCuts{false};  // false in Pb-Pb (as recommended in: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel)
+    // Reference: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel
+    bool applyPileupCuts{false};
     TString TaskPhysicsSelection_Options{TString::Format("(%i, %i)", (int)IsMC, (int)applyPileupCuts)};
     AliPhysicsSelectionTask *TaskPhysicsSelection{reinterpret_cast<AliPhysicsSelectionTask *>(
         gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options)  //
@@ -134,10 +136,18 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         )};
     if (TaskCentrality == nullptr) return;
 
-    TString TaskPIDResponse_Options{TString::Format("(%i, 1, 1, \"%i\")", (int)IsMC, PassNumber)};
+    // References:
+    // https://twiki.cern.ch/twiki/bin/viewauth/ALICE/PIDInAnalysis
+    // https://twiki.cern.ch/twiki/bin/viewauth/ALICE/TPCSplines
+    // https://alisw.github.io/git-advanced/#how-to-use-large-data-files-for-analysis
+    bool tuneOnData{IsMC};
+    TString pathTPCPIDResponse{AliDataFile::GetFileNameOADB("COMMON/PID/data/TPCPIDResponseOADB_pileupCorr.root")};
+    TString TaskPIDResponse_Options{
+        TString::Format("(%i, 1, %i, \"\", 0, "
+                        "\"TPC-OADB:%s;TPC-Maps:$ALICE_PHYSICS/OADB/COMMON/PID/data/TPCetaMaps_pileupCorr.root\")",
+                        (int)IsMC, (int)tuneOnData, pathTPCPIDResponse.Data())};
     AliAnalysisTaskPIDResponse *TaskPIDResponse{reinterpret_cast<AliAnalysisTaskPIDResponse *>(
-        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options)  //
-        )};
+        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options))};
     if (TaskPIDResponse == nullptr) return;
 
     std::cout << "!! INFO  !! runAnalysis.C !! Passed addition of helper tasks" << '\n';
