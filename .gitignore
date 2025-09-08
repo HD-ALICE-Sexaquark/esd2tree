@@ -22,15 +22,12 @@
 **/set_paths.sh
 **/doc/dir_numbers/
 **/task/exec.sh
-**/scripts/seff_all.sh
 **/RUN3
 **/sexaquark
 **/ilya
 .env
 **.fquota
-scripts/**/
-scripts/RN_**.txt
-scripts_mc/**/
-scripts_mc/RN_**.txt
 utilities/nevents/
 **.slurm.sh
+**/slurm
+scripts**/

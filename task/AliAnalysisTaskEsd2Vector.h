@@ -1,8 +1,7 @@
 #ifndef E2V_TASK_H
 #define E2V_TASK_H
 
-#define WRITE_ESD_INDICES 0
-#define INCLUDE_MUCH_INFO 0
+#define E2V_DEBUG 0
 
 #include <array>
 #include <fstream>
@@ -176,15 +175,16 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     std::vector<float> tMC_Pz;            //!
     std::vector<float> tMC_E;             //!
     std::vector<int> tMC_Status;          //!
-    std::vector<bool> tMC_IsOOBPileup;    //!
-    std::vector<int> tMC_Generator;       //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
-    std::vector<bool> tMC_IsPrimary;      //!
-    std::vector<bool> tMC_IsSecFromMat;   //!
-    std::vector<bool> tMC_IsSecFromWeak;  //!
-    // -- Tracks properties //
-#if WRITE_ESD_INDICES
-    std::vector<int> tTrack_EsdIdx;  //! DEBUG
+    std::vector<char> tMC_Generator;      //! 0: HIJING, 1: anti-neutron injector, 2: anti-sexaquark reaction
+    std::vector<char> tMC_IsPrimary;      //!
+    std::vector<char> tMC_IsSecFromMat;   //!
+    std::vector<char> tMC_IsSecFromWeak;  //!
+    std::vector<char> tMC_IsOOBPileup;    //!
+#if E2V_DEBUG
+    std::vector<int> tMC_iMC;         //!
+    std::vector<int> tMC_Mother_iMC;  //!
 #endif
+    // -- Tracks properties //
     std::vector<float> tTrack_X;             //! inner parametrization
     std::vector<float> tTrack_Y;             //! inner parametrization
     std::vector<float> tTrack_Z;             //! inner parametrization
@@ -197,39 +197,34 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     std::vector<float> tTrack_NSigmaProton;  //!
     std::vector<float> tTrack_DCAxy;         //! pre-calculated DCA wrt PV
     std::vector<float> tTrack_DCAz;          //! pre-calculated DCA wrt PV
-    std::vector<float> tTrack_SignalTPC;     //!
-    std::vector<float> tTrack_Alpha;         //!
-    std::vector<float> tTrack_Snp;           //! local sine of the track momentum azimuthal angle
-    std::vector<float> tTrack_Tgl;           //! tangent of the track momentum dip angle
-    std::vector<float> tTrack_Signed1Pt;     //! 1/pt
-    std::vector<float> tTrack_SigmaY2;       //! cov_matrix[0]
-    std::vector<float> tTrack_SigmaZY;       //! cov_matrix[1]
-    std::vector<float> tTrack_SigmaZ2;       //! cov_matrix[2]
-    std::vector<float> tTrack_SigmaSnpY;     //! cov_matrix[3]
-    std::vector<float> tTrack_SigmaSnpZ;     //! cov_matrix[4]
-    std::vector<float> tTrack_SigmaSnp2;     //! cov_matrix[5]
-    std::vector<float> tTrack_SigmaTglY;     //! cov_matrix[6]
-    std::vector<float> tTrack_SigmaTglZ;     //! cov_matrix[7]
-    std::vector<float> tTrack_SigmaTglSnp;   //! cov_matrix[8]
-    std::vector<float> tTrack_SigmaTgl2;     //! cov_matrix[9]
-    std::vector<float> tTrack_Sigma1PtY;     //! cov_matrix[10]
-    std::vector<float> tTrack_Sigma1PtZ;     //! cov_matrix[11]
-    std::vector<float> tTrack_Sigma1PtSnp;   //! cov_matrix[12]
-    std::vector<float> tTrack_Sigma1PtTgl;   //! cov_matrix[13]
-    std::vector<float> tTrack_Sigma1Pt2;     //! cov_matrix[14]
+    std::vector<float> tTrack_SigmaX2;       //!
+    std::vector<float> tTrack_SigmaXY;       //!
+    std::vector<float> tTrack_SigmaY2;       //!
+    std::vector<float> tTrack_SigmaXZ;       //!
+    std::vector<float> tTrack_SigmaYZ;       //!
+    std::vector<float> tTrack_SigmaZ2;       //!
+    std::vector<float> tTrack_SigmaXPx;      //!
+    std::vector<float> tTrack_SigmaYPx;      //!
+    std::vector<float> tTrack_SigmaZPx;      //!
+    std::vector<float> tTrack_SigmaPx2;      //!
+    std::vector<float> tTrack_SigmaXPy;      //!
+    std::vector<float> tTrack_SigmaYPy;      //!
+    std::vector<float> tTrack_SigmaZPy;      //!
+    std::vector<float> tTrack_SigmaPxPy;     //!
+    std::vector<float> tTrack_SigmaPy2;      //!
+    std::vector<float> tTrack_SigmaXPz;      //!
+    std::vector<float> tTrack_SigmaYPz;      //!
+    std::vector<float> tTrack_SigmaZPz;      //!
+    std::vector<float> tTrack_SigmaPxPz;     //!
+    std::vector<float> tTrack_SigmaPyPz;     //!
+    std::vector<float> tTrack_SigmaPz2;      //!
+#if E2V_DEBUG
+    // indices //
+    std::vector<int> tTrack_iESD;  //!
+    std::vector<int> tTrack_iMC;   //!
+#endif
     // -- MC Link //
     std::vector<int> tTrack_McEntry;  //!
-#if INCLUDE_MUCH_INFO
-    std::vector<bool> tTrack_IsKinkDaughter;    //!
-    std::vector<int> tTrack_NTPCClusters;       //!
-    std::vector<float> tTrack_NCrossedRows;     //!
-    std::vector<int> tTrack_NFindableClusters;  //!
-    std::vector<int> tTrack_NSharedClusters;    //!
-    std::vector<float> tTrack_Chi2overNcls;     //!
-#endif
-    // TBits tTrack_TPCFitMap;             //!
-    // TBits tTrack_TPCClusterMap;         //!
-    // TBits tTrack_TPCSharedMap;          //!
 
     ClassDef(AliAnalysisTaskEsd2Vector, 2);  // = number of persistent members
 };

@@ -81,9 +81,10 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         alienHandler = new AliAnalysisAlien();
         alienHandler->SetCheckCopy(false);
         alienHandler->AddIncludePath("-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include");
-        alienHandler->SetAdditionalLibs("AliAnalysisTaskEsd2Vector.cxx AliAnalysisTaskEsd2Vector.h AliAnalysisTaskEsd2Vector_Const.h");
+        alienHandler->SetAdditionalLibs(
+            "AliAnalysisTaskEsd2Vector.cxx AliAnalysisTaskEsd2Vector.h AliAnalysisTaskEsd2Vector_Const.h AliAnalysisTaskEsd2Vector_Cuts.h");
         alienHandler->SetAnalysisSource("AliAnalysisTaskEsd2Vector.cxx");
-        alienHandler->SetAliPhysicsVersion("vAN-20241126_O2-1");
+        alienHandler->SetAliPhysicsVersion("vAN-20250907_O2-1");
         alienHandler->SetExecutableCommand("aliroot -l -q -b");
         alienHandler->SetGridDataDir(InputPath);
         if (!IsMC) alienHandler->SetRunPrefix("000");
