@@ -80,8 +80,7 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
 
     // Tracks //
     void ProcessTracks();
-    bool PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param);
-    bool PassesTrackSelection_V2(const AliESDtrack* track);
+    bool PassesTrackSelection(const AliESDtrack* track);
     void ClearTracksBranches();
 
     // Injected Reactions //
@@ -192,11 +191,12 @@ class AliAnalysisTaskEsd2Vector : public AliAnalysisTaskSE {
     std::vector<float> tTrack_Py;            //! inner parametrization
     std::vector<float> tTrack_Pz;            //! inner parametrization
     std::vector<int> tTrack_Charge;          //!
+    std::vector<float> tTrack_DCAxy;         //! pre-calculated DCA wrt PV
+    std::vector<float> tTrack_DCAz;          //! pre-calculated DCA wrt PV
+    std::vector<float> tTrack_TPCSignal;     //!
     std::vector<float> tTrack_NSigmaPion;    //!
     std::vector<float> tTrack_NSigmaKaon;    //!
     std::vector<float> tTrack_NSigmaProton;  //!
-    std::vector<float> tTrack_DCAxy;         //! pre-calculated DCA wrt PV
-    std::vector<float> tTrack_DCAz;          //! pre-calculated DCA wrt PV
     std::vector<float> tTrack_SigmaX2;       //!
     std::vector<float> tTrack_SigmaXY;       //!
     std::vector<float> tTrack_SigmaY2;       //!

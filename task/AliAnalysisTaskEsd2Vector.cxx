@@ -105,11 +105,12 @@ AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector()
       tTrack_Py{},
       tTrack_Pz{},
       tTrack_Charge{},
+      tTrack_DCAxy{},
+      tTrack_DCAz{},
+      tTrack_TPCSignal{},
       tTrack_NSigmaPion{},
       tTrack_NSigmaKaon{},
       tTrack_NSigmaProton{},
-      tTrack_DCAxy{},
-      tTrack_DCAz{},
       tTrack_SigmaX2{},
       tTrack_SigmaXY{},
       tTrack_SigmaY2{},
@@ -236,11 +237,12 @@ AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector(const char* name)
       tTrack_Py{},
       tTrack_Pz{},
       tTrack_Charge{},
+      tTrack_DCAxy{},
+      tTrack_DCAz{},
+      tTrack_TPCSignal{},
       tTrack_NSigmaPion{},
       tTrack_NSigmaKaon{},
       tTrack_NSigmaProton{},
-      tTrack_DCAxy{},
-      tTrack_DCAz{},
       tTrack_SigmaX2{},
       tTrack_SigmaXY{},
       tTrack_SigmaY2{},
@@ -591,11 +593,12 @@ void AliAnalysisTaskEsd2Vector::CreateTracksBranches() {
     fOutputTree->Branch("Track_Py", &tTrack_Py);
     fOutputTree->Branch("Track_Pz", &tTrack_Pz);
     fOutputTree->Branch("Track_Charge", &tTrack_Charge);
+    fOutputTree->Branch("Track_DCAxy", &tTrack_DCAxy);
+    fOutputTree->Branch("Track_DCAz", &tTrack_DCAz);
+    fOutputTree->Branch("Track_TPCSignal", &tTrack_TPCSignal);
     fOutputTree->Branch("Track_NSigmaPion", &tTrack_NSigmaPion);
     fOutputTree->Branch("Track_NSigmaKaon", &tTrack_NSigmaKaon);
     fOutputTree->Branch("Track_NSigmaProton", &tTrack_NSigmaProton);
-    fOutputTree->Branch("Track_DCAxy", &tTrack_DCAxy);
-    fOutputTree->Branch("Track_DCAz", &tTrack_DCAz);
     fOutputTree->Branch("Track_SigmaX2", &tTrack_SigmaX2);
     fOutputTree->Branch("Track_SigmaXY", &tTrack_SigmaXY);
     fOutputTree->Branch("Track_SigmaY2", &tTrack_SigmaY2);
@@ -720,12 +723,11 @@ void AliAnalysisTaskEsd2Vector::ClearMCBranches() {
 
 // Loop over the reconstructed tracks in a single event.
 void AliAnalysisTaskEsd2Vector::ProcessTracks() {
-    for (int esd_idx{0}; esd_idx < fESD->GetNumberOfTracks(); ++esd_idx) {
+    for (int iESD{0}; iESD < fESD->GetNumberOfTracks(); ++iESD) {
         // get track //
-        auto* track = fESD->GetTrack(esd_idx);
+        auto* track = fESD->GetTrack(iESD);
         // track selection //
-        // if (!PassesTrackSelection(track, tpc_inner_param)) continue;
-        if (!PassesTrackSelection_V2(track)) continue;
+        if (!PassesTrackSelection(track)) continue;
         // get info //
         const auto* inner_param{track->GetInnerParam()};
         double position[3]{};
@@ -745,11 +747,14 @@ void AliAnalysisTaskEsd2Vector::ProcessTracks() {
         tTrack_Py.push_back(static_cast<float>(momentum[1]));
         tTrack_Pz.push_back(static_cast<float>(momentum[2]));
         tTrack_Charge.push_back(inner_param->Charge());
+        // -- dca //
+        tTrack_DCAxy.push_back(dca[0]);
+        tTrack_DCAz.push_back(dca[1]);
+        // -- pid //
+        tTrack_TPCSignal.push_back(fIsMC ? track->GetTPCsignalTunedOnData() : track->GetTPCsignal());
         tTrack_NSigmaPion.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion));
         tTrack_NSigmaKaon.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon));
         tTrack_NSigmaProton.push_back(fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton));
-        tTrack_DCAxy.push_back(dca[0]);
-        tTrack_DCAz.push_back(dca[1]);
         // -- cov. matrix //
         tTrack_SigmaX2.push_back(static_cast<float>(cov_xyz_pxpypz[0]));
         tTrack_SigmaXY.push_back(static_cast<float>(cov_xyz_pxpypz[1]));
@@ -773,7 +778,7 @@ void AliAnalysisTaskEsd2Vector::ProcessTracks() {
         tTrack_SigmaPyPz.push_back(static_cast<float>(cov_xyz_pxpypz[19]));
         tTrack_SigmaPz2.push_back(static_cast<float>(cov_xyz_pxpypz[20]));
 #if E2V_DEBUG
-        tTrack_iESD.push_back(esd_idx);
+        tTrack_iESD.push_back(iESD);
         if (fIsMC) tTrack_iMC.push_back(std::abs(track->GetLabel()));
 #endif
         if (fIsMC) tTrack_McEntry.push_back(fVec_McEntry[std::abs(track->GetLabel())]);
@@ -781,316 +786,103 @@ void AliAnalysisTaskEsd2Vector::ProcessTracks() {
 }
 
 // Check if track passes selection and fill bookkeeping histograms.
-bool AliAnalysisTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track, const AliExternalTrackParam* inner_param) {
+bool AliAnalysisTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track) {
 
-    bool its_status{((track->GetStatus() & AliESDtrack::kITSin) == 0U) && ((track->GetStatus() & AliESDtrack::kITSout) == 0U) &&
-                    ((track->GetStatus() & AliESDtrack::kITSrefit) == 0U)};
-    if (Cuts::Track::TurnedOn_StatusCuts && !its_status) return false;
     fHist_Tracks_Bookkeeping->Fill(0);
 
-    if (std::abs(inner_param->Eta()) > Cuts::Track::AbsMax_Eta) return false;
+    // -- dca
+
+    float dca[2]{}, cov_dca[3]{};
+    track->GetImpactParameters(dca, cov_dca);
+    if (std::abs(dca[0]) / 15. + std::abs(dca[1]) / 20. <= 1.) return false;
     fHist_Tracks_Bookkeeping->Fill(1);
+
+    // -- status
+
+    unsigned long long status{track->GetStatus()};
+    bool tpc_in{(status & AliESDtrack::kTPCin) > 0};
+    bool tpc_refit{(status & AliESDtrack::kTPCrefit) > 0};
+
+    if (!tpc_in) return false;
+    fHist_Tracks_Bookkeeping->Fill(2);
+
+    if (!tpc_refit) return false;
+    fHist_Tracks_Bookkeeping->Fill(3);
+
+    // -- kinematics //
+
+    const auto* inner_param = track->GetInnerParam();
+
+    if (std::abs(inner_param->Pz()) > Cuts::Track::AbsMax_Pz) return false;
+    fHist_Tracks_Bookkeeping->Fill(4);
+
+    if (inner_param->P() < Cuts::Track::Min_P || inner_param->P() > Cuts::Track::Max_P) return false;
+    fHist_Tracks_Bookkeeping->Fill(5);
+
+    if (std::abs(inner_param->Eta()) > Cuts::Track::AbsMax_Eta) return false;
+    fHist_Tracks_Bookkeeping->Fill(6);
+
+    if (inner_param->Pt() < Cuts::Track::Min_Pt || inner_param->Pt() > Cuts::Track::Max_Pt) return false;
+    fHist_Tracks_Bookkeeping->Fill(7);
+
+    // -- pid //
+
+    if (track->GetTPCsignal() > 200.) return false;
+    fHist_Tracks_Bookkeeping->Fill(8);
 
     float n_sigma_proton{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kProton)};
     float n_sigma_kaon{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kKaon)};
     float n_sigma_pion{fPIDResponse->NumberOfSigmasTPC(track, AliPID::kPion)};
-    if (std::abs(n_sigma_proton) > Cuts::Track::AbsMax_NSigma_Proton && std::abs(n_sigma_kaon) > Cuts::Track::AbsMax_NSigma_Kaon &&
-        std::abs(n_sigma_pion) > Cuts::Track::AbsMax_NSigma_Pion) {
+    if (std::abs(n_sigma_proton) > Cuts::Track::AbsMax_NSigma_PID && std::abs(n_sigma_kaon) > Cuts::Track::AbsMax_NSigma_PID &&
+        std::abs(n_sigma_pion) > Cuts::Track::AbsMax_NSigma_PID) {
         return false;
     }
-    fHist_Tracks_Bookkeeping->Fill(2);
-
-    float DCAxy_wrtPV, DCAz_wrtPV;
-    track->GetImpactParameters(DCAxy_wrtPV, DCAz_wrtPV);
-    if (std::abs(DCAxy_wrtPV) < Cuts::Track::Min_DCAxy_wrtPV) return false;
-    fHist_Tracks_Bookkeeping->Fill(3);
-
-    if (inner_param->Pt() < Cuts::Track::Min_Pt || inner_param->Pt() > Cuts::Track::Max_Pt) return false;
-    fHist_Tracks_Bookkeeping->Fill(4);
-
-    double NTPCClusters{static_cast<double>(track->GetTPCNcls())};
-    if (NTPCClusters < Cuts::Track::Min_NClusterTPC) return false;
-    fHist_Tracks_Bookkeeping->Fill(5);
-
-    double Chi2PerNTPCClusters{NTPCClusters > 0. ? track->GetTPCchi2() / NTPCClusters : Const::DummyFloat};
-    if (Chi2PerNTPCClusters > Cuts::Track::Max_Chi2PerClusterTPC) return false;
-    fHist_Tracks_Bookkeeping->Fill(6);
-
-    bool tpc_status{((track->GetStatus() & AliESDtrack::kTPCout) != 0U) && ((track->GetStatus() & AliESDtrack::kTPCrefit) != 0U)};
-    if (Cuts::Track::TurnedOn_StatusCuts && !tpc_status) return false;
-    fHist_Tracks_Bookkeeping->Fill(7);
-
-    if (Cuts::Track::RejectKinks && track->GetKinkIndex(0) > 0) return false;
-    fHist_Tracks_Bookkeeping->Fill(8);
-
-    return true;
-}
-
-// Figure out if the track survives all 45 cuts defined by
-// different quality parameters, kinematics and geometry.
-// Based on `AliESDtrackCuts::AcceptTrack`
-bool AliAnalysisTaskEsd2Vector::PassesTrackSelection_V2(const AliESDtrack* track) {
-
-    // get status //
-    unsigned long long status{track->GetStatus()};
-
-    // 0 : require TPC refit
-    fHist_Tracks_Bookkeeping->Fill(0);
-    if (Cuts::Track::RequireTPCRefit && (status & AliESDtrack::kTPCrefit) == 0) return false;
-
-    // get TPC inner param //
-    const AliExternalTrackParam* tpc_inner_param{track->GetTPCInnerParam()};
-
-    // 1 : require TPC standalone
-    fHist_Tracks_Bookkeeping->Fill(1);
-    if (Cuts::Track::RequireTPCStandalone && (status & AliESDtrack::kTPCin) == 0) return false;
-
-    // 2 : require ITS refit
-    // -- removed
-
-    // 3 : n TPC clusters
-    fHist_Tracks_Bookkeeping->Fill(3);
-    unsigned short nClustersTPC{track->GetTPCNcls()};
-    if (Cuts::Track::RequireTPCStandalone) {
-        nClustersTPC = track->GetTPCNclsIter1();
-    }
-    if (nClustersTPC < Cuts::Track::Min_NClusterTPC) return false;
-
-    // 4 : n ITS clusters
-    // -- removed
-
-    // 5 : chi2 per TPC cluster
-    fHist_Tracks_Bookkeeping->Fill(5);
-    double chi2PerClusterTPC{-1.};
-    if (nClustersTPC > 0) {
-        if (Cuts::Track::RequireTPCStandalone) {
-            chi2PerClusterTPC = static_cast<double>(track->GetTPCchi2Iter1()) / static_cast<double>(nClustersTPC);
-        } else {
-            chi2PerClusterTPC = static_cast<double>(track->GetTPCchi2()) / static_cast<double>(nClustersTPC);
-        }
-    }
-    if (chi2PerClusterTPC > Cuts::Track::Max_Chi2PerClusterTPC) return false;
-
-    // 6 : chi2 per ITS cluster
-    // -- removed
-
-    // 7 : max res. y^2
-    fHist_Tracks_Bookkeeping->Fill(7);
-    if (tpc_inner_param->GetSigmaY2() > Cuts::Track::Max_C11) return false;
-
-    // 8 : max res. z^2
-    fHist_Tracks_Bookkeeping->Fill(8);
-    if (tpc_inner_param->GetSigmaZ2() > Cuts::Track::Max_C22) return false;
-
-    // 9 : max res. sin(phi)^2
     fHist_Tracks_Bookkeeping->Fill(9);
-    if (tpc_inner_param->GetSigmaSnp2() > Cuts::Track::Max_C33) return false;
 
-    // 10 : max res. tan(theta_dip)^2
+    // -- its info
+
+    if (track->GetITSNcls() > 0) return false;
     fHist_Tracks_Bookkeeping->Fill(10);
-    if (tpc_inner_param->GetSigmaTgl2() > Cuts::Track::Max_C44) return false;
 
-    // 11 : max res. 1/pt^2
+    // -- tpc info
+
+    if (track->GetTPCPoints(0) > 110.) return false;
     fHist_Tracks_Bookkeeping->Fill(11);
-    if (tpc_inner_param->GetSigma1Pt2() > Cuts::Track::Max_C55) return false;
 
-    // 12 : (below)
-    // 13 : (below)
+    double n_tpc_clusters{static_cast<double>(track->GetTPCNcls())};
+    if (n_tpc_clusters < Cuts::Track::Min_NClusterTPC) return false;
+    fHist_Tracks_Bookkeeping->Fill(12);
 
-    // 14 : reject kinks
+    // -- others
+
+    if (track->GetKinkIndex(0) > 0) return false;
+    fHist_Tracks_Bookkeeping->Fill(13);
+
+    // -- qa
+
+    if (std::abs(cov_dca[0]) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(14);
-    if (Cuts::Track::RejectKinks && track->GetKinkIndex(0) > 0) return false;
 
-    // get momentum //
-    double p[3]{};
-    tpc_inner_param->GetPxPyPz(p);
-
-    // 15 : total momentum
+    if (std::abs(cov_dca[1]) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(15);
-    double momentum{std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2])};
-    if ((momentum < Cuts::Track::Min_P) || (momentum > Cuts::Track::Max_P)) return false;
 
-    // 16 : transverse momentum
+    if (std::abs(cov_dca[2]) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(16);
-    double pt{std::sqrt(p[0] * p[0] + p[1] * p[1])};
-    if ((pt < Cuts::Track::Min_Pt) || (pt > Cuts::Track::Max_Pt)) return false;
 
-    // 17 : x-component of momentum
+    if (std::abs(inner_param->GetSigmaY2()) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(17);
-    if ((p[0] < Cuts::Track::Min_Px) || (p[0] > Cuts::Track::Max_Px)) return false;
 
-    // 18 : y-component of momentum
+    if (std::abs(inner_param->GetSigmaZ2()) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(18);
-    if ((p[1] < Cuts::Track::Min_Py) || (p[1] > Cuts::Track::Max_Py)) return false;
 
-    // 19 : z-component of momentum
+    if (std::abs(inner_param->GetSigmaSnp2()) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(19);
-    if ((p[2] < Cuts::Track::Min_Pz) || (p[2] > Cuts::Track::Max_Pz)) return false;
 
-    // 20 : pseudorapidity
-    // -- modified from min. and max. to abs. max.
+    if (std::abs(inner_param->GetSigmaTgl2()) >= Cuts::Track::AbsMax_Cov) return false;
     fHist_Tracks_Bookkeeping->Fill(20);
-    double eta{-100.};
-    if (momentum != std::abs(p[2])) eta = std::log((momentum + p[2]) / (momentum - p[2])) / 2.;
-    if (std::abs(eta) > Cuts::Track::AbsMax_Eta) return false;
 
-    // 21 : rapidity
-    // -- removed as it requires mass hypothesis
-
-    // get DCA //
-    float DCAxy{0.};
-    float DCAz{0.};
-    track->GetImpactParametersTPC(DCAxy, DCAz);
-
-    // 22 : DCA cut as ellipse (a)
-    fHist_Tracks_Bookkeeping->Fill(22);
-    if (Cuts::Track::DoDCACut_AsEllipse && DCAxy * DCAxy / Cuts::Track::Max_DCAxy_wrtPV / Cuts::Track::Max_DCAxy_wrtPV +
-                                                   DCAz * DCAz / Cuts::Track::Max_DCAz_wrtPV / Cuts::Track::Max_DCAz_wrtPV >
-                                               1.) {
-        return false;
-    }
-
-    // 23 : DCA cut as rectangle (a)
-    fHist_Tracks_Bookkeeping->Fill(23);
-    if (Cuts::Track::DoDCACut_AsRectangle && std::abs(DCAxy) > Cuts::Track::Max_DCAxy_wrtPV) return false;
-
-    // 24 : DCA cut as rectangle (b)
-    fHist_Tracks_Bookkeeping->Fill(24);
-    if (Cuts::Track::DoDCACut_AsRectangle && std::abs(DCAz) > Cuts::Track::Max_DCAz_wrtPV) return false;
-
-    // 25 : DCA cut as ellipse (b)
-    fHist_Tracks_Bookkeeping->Fill(25);
-    if (Cuts::Track::DoDCACut_AsEllipse && Cuts::Track::Min_DCAxy_wrtPV > 0. && Cuts::Track::Min_DCAz_wrtPV > 0. &&
-        DCAxy * DCAxy / Cuts::Track::Min_DCAxy_wrtPV / Cuts::Track::Min_DCAxy_wrtPV +
-                DCAz * DCAz / Cuts::Track::Min_DCAz_wrtPV / Cuts::Track::Min_DCAz_wrtPV <
-            1.) {
-        return false;
-    }
-
-    // 26 : DCA cut as rectangle (c)
-    fHist_Tracks_Bookkeeping->Fill(26);
-    if (Cuts::Track::DoDCACut_AsRectangle && std::abs(DCAxy) < Cuts::Track::Min_DCAxy_wrtPV) return false;
-
-    // 27 : DCA cut as rectangle (d)
-    fHist_Tracks_Bookkeeping->Fill(27);
-    if (Cuts::Track::DoDCACut_AsRectangle && std::abs(DCAz) < Cuts::Track::Min_DCAz_wrtPV) return false;
-
-    // 28 : SPD cluster requirement
-    // -- removed
-
-    // 29 : SDD cluster requirement
-    // -- removed
-
-    // 30 : SSD cluster requirement
-    // -- removed
-
-    // 31 : ITS standalone
-    // -- removed
-
-    // 32 : pt-dependent pt resolution cut
-    // -- temporarily removed
-
-    // 33 : reject shared TPC clusters
-    fHist_Tracks_Bookkeeping->Fill(33);
-    int nClustersTPCShared{track->GetTPCnclsS()};
-    if (Cuts::Track::RejectSharedTPCClusters && nClustersTPCShared != 0) return false;
-
-    // 34 : fraction shared TPC clusters
-    fHist_Tracks_Bookkeeping->Fill(34);
-    double fracClustersTPCShared{-1.};
-    if (nClustersTPC > 0) {
-        fracClustersTPCShared = static_cast<double>(nClustersTPCShared) / static_cast<double>(nClustersTPC);
-    }
-    if (fracClustersTPCShared > Cuts::Track::Max_FractionSharedTPCClusters) return false;
-
-    // 35 : require ITS PID
-    // -- removed
-
-    // 36 : n crossed rows TPC
-    fHist_Tracks_Bookkeeping->Fill(36);
-    float nCrossedRowsTPC{track->GetTPCCrossedRows()};
-    if (nCrossedRowsTPC < Cuts::Track::Min_NCrossedRowsTPC) return false;
-
-    // 37 : ratio crossed rows over findable clusters TPC
-    fHist_Tracks_Bookkeeping->Fill(37);
-    double nFindableClustersTPC{static_cast<double>(track->GetTPCNclsF())};
-    double ratioCrossedRowsOverFindableClustersTPC{1.};
-    if (nFindableClustersTPC > 0) {
-        ratioCrossedRowsOverFindableClustersTPC = static_cast<double>(nCrossedRowsTPC) / static_cast<double>(nFindableClustersTPC);
-    }
-    if (ratioCrossedRowsOverFindableClustersTPC < Cuts::Track::Min_RatioCrossedRowsOverFindableClustersTPC) return false;
-
-    // 38 : max missing ITS points
-    // -- removed
-
-    // 39 : (below)
-
-    // 40 : require TOF out
-    // -- removed
-
-    // 41 : TOF signal dz
-    // -- removed
-
-    // CPU intensive cuts //
-
-    if (Cuts::Track::RequireNSigmaToVertex) {
-        // 12 : n sigma to vertex
-        fHist_Tracks_Bookkeeping->Fill(12);
-        double nSigmaToVertex{Cuts::GetSigmaToVertex(track)};
-        if (nSigmaToVertex > Cuts::Track::Max_NSigmaToVertex) return false;
-
-        // 13 : if n sigma to vertex couldn't be calculated
-        fHist_Tracks_Bookkeeping->Fill(13);
-        if (nSigmaToVertex < 0.) return false;
-    }
-
-    // 39 : max chi2 TPC constrained vs global track
-    fHist_Tracks_Bookkeeping->Fill(39);
-    if (Cuts::Track::Max_Chi2TPCConstrainedVsGlobal < 1E9) {
-        // get vertex
-        const AliESDVertex* vertex{nullptr};
-        if (Cuts::Track::VertexType_Chi2TPCConstrainedVsGlobal & Cuts::EVertexType::VertexTracks) {
-            vertex = fESD->GetPrimaryVertexTracks();
-        }
-        if ((!vertex || !vertex->GetStatus()) && Cuts::Track::VertexType_Chi2TPCConstrainedVsGlobal & Cuts::EVertexType::VertexSPD) {
-            vertex = fESD->GetPrimaryVertexSPD();
-        }
-        if ((!vertex || !vertex->GetStatus()) && Cuts::Track::VertexType_Chi2TPCConstrainedVsGlobal & Cuts::EVertexType::VertexTPC) {
-            vertex = fESD->GetPrimaryVertexTPC();
-        }
-
-        double chi2TPCConstrainedVsGlobal{-2.};
-        if (vertex->GetStatus()) chi2TPCConstrainedVsGlobal = track->GetChi2TPCConstrainedVsGlobal(vertex);
-
-        if (chi2TPCConstrainedVsGlobal < 0. || chi2TPCConstrainedVsGlobal > Cuts::Track::Max_Chi2TPCConstrainedVsGlobal) return false;
-    }
-
-    if (Cuts::Track::Min_LengthActiveVolumeTPC > 1. || Cuts::Track::GeoNcrNclLength > 0.) {
-        double lengthInActiveZoneTPC{-1.};
-
-        // 42 : min length in active volume
-        fHist_Tracks_Bookkeeping->Fill(42);
-        const double kMaxZ = 220;
-        if (track->GetInnerParam()) {
-            lengthInActiveZoneTPC = track->GetLengthInActiveZone(1, Cuts::Track::DeadZoneWidth, kMaxZ, fESD->GetMagneticField());
-        }
-        if (lengthInActiveZoneTPC < Cuts::Track::Min_LengthActiveVolumeTPC) return false;
-
-        // 43 : n-geometrical+n-crossed-row and n-clusters cut
-        if (Cuts::Track::GeoNcrNclLength > 0) {
-            fHist_Tracks_Bookkeeping->Fill(43);
-            double cutGeoNcrNclLength = Cuts::Track::GeoNcrNclLength - std::pow(std::abs(track->GetSigned1Pt()), Cuts::Track::GeoNcrNclGeom1Pt);
-            if (lengthInActiveZoneTPC < cutGeoNcrNclLength) return false;
-            if (nCrossedRowsTPC < Cuts::Track::GeoNcrNclFractionNcr * cutGeoNcrNclLength) return false;
-            if (track->GetTPCncls() < Cuts::Track::GeoNcrNclFractionNcl * cutGeoNcrNclLength) return false;
-        }
-    }
-
-    // 44 : is track in distorted TPC region
-    if (Cuts::Track::DistortedRegionTPC) {
-        fHist_Tracks_Bookkeeping->Fill(44);
-        if (Cuts::IsTrackInDistortedTpcRegion(track)) return false;
-    }
+    if (std::abs(inner_param->GetSigma1Pt2()) >= Cuts::Track::AbsMax_Cov) return false;
+    fHist_Tracks_Bookkeeping->Fill(21);
 
     return true;
 }
@@ -1104,11 +896,12 @@ void AliAnalysisTaskEsd2Vector::ClearTracksBranches() {
     tTrack_Py.clear();
     tTrack_Pz.clear();
     tTrack_Charge.clear();
+    tTrack_DCAxy.clear();
+    tTrack_DCAz.clear();
+    tTrack_TPCSignal.clear();
     tTrack_NSigmaPion.clear();
     tTrack_NSigmaKaon.clear();
     tTrack_NSigmaProton.clear();
-    tTrack_DCAxy.clear();
-    tTrack_DCAz.clear();
     tTrack_SigmaX2.clear();
     tTrack_SigmaXY.clear();
     tTrack_SigmaY2.clear();

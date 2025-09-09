@@ -19,6 +19,7 @@ output/
 **/slurm_logs/
 task/exec.sh
 .env
+.shellcheckrc
 slurm/
 doc/**.md
 doc/**_TEST.txt
