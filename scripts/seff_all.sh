@@ -6,14 +6,17 @@
 # - number of jobs that completed, failed, or timed out                            #
 # - the maximum and average memory and time used by the jobs                       #
 
+if [[ $# -ne 1 ]]; then echo "usage: ./seff_all <dir_that_contains_logs>"; exit 1; fi
+logs_dir=$1
+
 function convert_to_mb() {
     local size=$1
-    echo $size | numfmt --from=iec --to-unit=1048576
+    echo ${size} | numfmt --from=iec --to-unit=1048576
 }
 
 function convert_time_to_seconds() {
     local time=$1
-    echo $time | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }'
+    echo ${time} | awk -F: '{ print ($1 * 3600) + ($2 * 60) + $3 }'
 }
 
 function convert_seconds_to_human_readable() {
@@ -30,9 +33,7 @@ AVG_MEM=0
 MAX_TIME=0
 AVG_TIME=0
 
-if [[ -z ${E2V_SLURM_DIR} ]]; then echo "missing E2V_SLURM_DIR"; exit 1; fi
-JOBIDS=()
-mapfile -t JOBIDS < <(basename -s .out ${E2V_SLURM_DIR}/*.out)
+JOBIDS=($(basename -s .log ${logs_dir}/*.log))
 
 for ((i=0; i<${#JOBIDS[@]}; i++)); do
 
@@ -76,7 +77,7 @@ for ((i=0; i<${#JOBIDS[@]}; i++)); do
 
     # time
     JOB_TIME=$(echo ${SEFF_OUT} | grep -oP 'Job Wall-clock time: \K[0-9:]+')
-    JOB_TIME=$(convert_time_to_seconds $JOB_TIME)
+    JOB_TIME=$(convert_time_to_seconds ${JOB_TIME})
     if [[ ${JOB_TIME} -gt ${MAX_TIME} ]]; then
         MAX_TIME=${JOB_TIME}
     fi
