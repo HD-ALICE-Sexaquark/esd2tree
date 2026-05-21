@@ -1,4 +1,4 @@
-#include "AliAnalysisTaskEsd2Vector.h"
+#include "AliTaskEsd2Vector.h"
 
 #include <fstream>
 #include <sstream>
@@ -24,13 +24,13 @@
 #include <AliPIDResponse.h>
 #include <AliVEvent.h>
 
-#include "AliAnalysisTaskEsd2Vector_Const.h"
-#include "AliAnalysisTaskEsd2Vector_Cuts.h"
+#include "AliTaskEsd2Vector_Const.h"
+#include "AliTaskEsd2Vector_Cuts.h"
 
-ClassImp(AliAnalysisTaskEsd2Vector);
+ClassImp(AliTaskEsd2Vector);
 
 // Constructor, called locally.
-AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector(const char* name)
+AliTaskEsd2Vector::AliTaskEsd2Vector(const char* name)
     : AliAnalysisTaskSE{name},
       //
       fIsMC{false},
@@ -203,17 +203,17 @@ AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector(const char* name)
 }
 
 // Empty I/O constructor. Non-persistent members are initialized to their default values from here.
-AliAnalysisTaskEsd2Vector::AliAnalysisTaskEsd2Vector() : AliAnalysisTaskEsd2Vector{""} {}
+AliTaskEsd2Vector::AliTaskEsd2Vector() : AliTaskEsd2Vector{""} {}
 
 // Destructor.
 // NOTE: if `TList::SetOwner(true)` was called, the TList destructor should delete all objects added to it.
-AliAnalysisTaskEsd2Vector::~AliAnalysisTaskEsd2Vector() {
+AliTaskEsd2Vector::~AliTaskEsd2Vector() {
     delete fOutputList;
     delete fOutputTree;
 }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Vector.C` macro.
-void AliAnalysisTaskEsd2Vector::Initialize(bool is_mc, bool is_signal_mc) {
+void AliTaskEsd2Vector::Initialize(bool is_mc, bool is_signal_mc) {
     fIsMC = is_mc;
     fIsSignalMC = is_signal_mc;
     // print settings //
@@ -227,7 +227,7 @@ void AliAnalysisTaskEsd2Vector::Initialize(bool is_mc, bool is_signal_mc) {
 // # Executed at Runtime # //
 
 // Create output objects, called once at RUNTIME ~ execution on Grid.
-void AliAnalysisTaskEsd2Vector::UserCreateOutputObjects() {
+void AliTaskEsd2Vector::UserCreateOutputObjects() {
 
     auto* man = AliAnalysisManager::GetAnalysisManager();
     if (man == nullptr) AliFatal("AliAnalysisManager couldn't be found.");
@@ -274,7 +274,7 @@ void AliAnalysisTaskEsd2Vector::UserCreateOutputObjects() {
 // User implementation of `Notify()`. Needed for reading the AliEn path.
 // This function is loaded during `AliAnalysisManager::Notify()`.
 // It's called after `UserCreateOutputObjects()`, for each new file, and before the first `UserExec()`.
-bool AliAnalysisTaskEsd2Vector::UserNotify() {
+bool AliTaskEsd2Vector::UserNotify() {
 
     auto* man = AliAnalysisManager::GetAnalysisManager();
     if (man == nullptr) AliFatal("Analysis Manager not found");
@@ -326,7 +326,7 @@ bool AliAnalysisTaskEsd2Vector::UserNotify() {
 }
 
 // Main function, called per each event at RUNTIME ~ execution on Grid.
-void AliAnalysisTaskEsd2Vector::UserExec(Option_t* option) {
+void AliTaskEsd2Vector::UserExec(Option_t* option) {
 
     // events //
 
@@ -365,7 +365,7 @@ void AliAnalysisTaskEsd2Vector::UserExec(Option_t* option) {
 
 // # Events # //
 
-bool AliAnalysisTaskEsd2Vector::ProcessEvent() {
+bool AliTaskEsd2Vector::ProcessEvent() {
 
 #if E2V_DEBUG
     AliInfoF("fPIDResponse.UseTPCEtaCorrection()          = %i", fPIDResponse->UseTPCEtaCorrection());
@@ -451,7 +451,7 @@ bool AliAnalysisTaskEsd2Vector::ProcessEvent() {
 }
 
 // Apply event selection.
-bool AliAnalysisTaskEsd2Vector::PassesEventSelection() {
+bool AliTaskEsd2Vector::PassesEventSelection() {
 
     fHist_Events_Bookkeeping->Fill(0.);
     if (!fEventCuts.AcceptEvent(fESD)) return false;
@@ -483,7 +483,7 @@ bool AliAnalysisTaskEsd2Vector::PassesEventSelection() {
 // # Trees # //
 
 // Add branches to `fOutputTree`.
-void AliAnalysisTaskEsd2Vector::CreateEventsBranches() {
+void AliTaskEsd2Vector::CreateEventsBranches() {
     fOutputTree->Branch("RunNumber", &fRunNumber);
     fOutputTree->Branch("DirNumber", &fDirNumber);
     if (!fIsMC) fOutputTree->Branch("DirNumberB", &fDirNumberB);
@@ -515,7 +515,7 @@ void AliAnalysisTaskEsd2Vector::CreateEventsBranches() {
 }
 
 // Add branches to `fTree_Injected`.
-void AliAnalysisTaskEsd2Vector::CreateInjectedBranches() {
+void AliTaskEsd2Vector::CreateInjectedBranches() {
     fOutputTree->Branch("ReactionID", &tInjected_ReactionID);
     fOutputTree->Branch("Sexa_Px", &tInjected_Px);
     fOutputTree->Branch("Sexa_Py", &tInjected_Py);
@@ -526,7 +526,7 @@ void AliAnalysisTaskEsd2Vector::CreateInjectedBranches() {
 }
 
 // Add branches to the MC tree.
-void AliAnalysisTaskEsd2Vector::CreateMCBranches() {
+void AliTaskEsd2Vector::CreateMCBranches() {
     fOutputTree->Branch("MC_PdgCode", &tMC_PdgCode);
     fOutputTree->Branch("MC_Charge", &tMC_Charge);
     fOutputTree->Branch("MC_Mother_McEntry", &tMC_Mother_McEntry);
@@ -551,7 +551,7 @@ void AliAnalysisTaskEsd2Vector::CreateMCBranches() {
 }
 
 // Add branches to the tracks tree.
-void AliAnalysisTaskEsd2Vector::CreateTracksBranches() {
+void AliTaskEsd2Vector::CreateTracksBranches() {
     fOutputTree->Branch("Track_EsdEntry", &tTrack_EsdEntry);
     fOutputTree->Branch("Track_X", &tTrack_X);
     fOutputTree->Branch("Track_Y", &tTrack_Y);
@@ -598,7 +598,7 @@ void AliAnalysisTaskEsd2Vector::CreateTracksBranches() {
     if (fIsMC) fOutputTree->Branch("Track_McEntry", &tTrack_McEntry);
 }
 
-void AliAnalysisTaskEsd2Vector::CreateLambdasBranches() {
+void AliTaskEsd2Vector::CreateLambdasBranches() {
     fOutputTree->Branch("Lambda_EsdEntry", &tLambda_EsdEntry);
     fOutputTree->Branch("Lambda_Decay_X", &tLambda_Decay_X);
     fOutputTree->Branch("Lambda_Decay_Y", &tLambda_Decay_Y);
@@ -636,7 +636,7 @@ void AliAnalysisTaskEsd2Vector::CreateLambdasBranches() {
 // # MC Generated # //
 
 // Loop over MC particles in a single event.
-void AliAnalysisTaskEsd2Vector::ProcessMCParticles() {
+void AliTaskEsd2Vector::ProcessMCParticles() {
     const int n_mc = fMC->GetNumberOfTracks();
     ReserveBranches_MC(static_cast<std::size_t>(n_mc));
     // read mc particles //
@@ -675,7 +675,7 @@ void AliAnalysisTaskEsd2Vector::ProcessMCParticles() {
 }
 
 // Reserve MC particle's vectors' memory allocation.
-void AliAnalysisTaskEsd2Vector::ReserveBranches_MC(std::size_t size) {
+void AliTaskEsd2Vector::ReserveBranches_MC(std::size_t size) {
     tMC_PdgCode.reserve(size);
     tMC_Charge.reserve(size);
     tMC_Mother_McEntry.reserve(size);
@@ -700,7 +700,7 @@ void AliAnalysisTaskEsd2Vector::ReserveBranches_MC(std::size_t size) {
 }
 
 // Clear MC branches.
-void AliAnalysisTaskEsd2Vector::ClearBranches_MC() {
+void AliTaskEsd2Vector::ClearBranches_MC() {
     tMC_PdgCode.clear();
     tMC_Charge.clear();
     tMC_Mother_McEntry.clear();
@@ -727,7 +727,7 @@ void AliAnalysisTaskEsd2Vector::ClearBranches_MC() {
 // # Reconstructed # //
 
 // Loop over the reconstructed tracks in a single event.
-void AliAnalysisTaskEsd2Vector::ProcessTracks() {
+void AliTaskEsd2Vector::ProcessTracks() {
     const int n_tracks = fESD->GetNumberOfTracks();
     ReserveBranches_Tracks(static_cast<std::size_t>(n_tracks));
     for (int esd_entry = 0; esd_entry < n_tracks; ++esd_entry) {
@@ -831,7 +831,7 @@ void AliAnalysisTaskEsd2Vector::ProcessTracks() {
 }
 
 // Check if track passes selection and fill bookkeeping histograms.
-bool AliAnalysisTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track) {
+bool AliTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track) {
 
     fHist_Tracks_Bookkeeping->Fill(0);
 
@@ -913,7 +913,7 @@ bool AliAnalysisTaskEsd2Vector::PassesTrackSelection(const AliESDtrack* track) {
 }
 
 // Reserve tracks-related vectors' memory allocation.
-void AliAnalysisTaskEsd2Vector::ReserveBranches_Tracks(std::size_t size) {
+void AliTaskEsd2Vector::ReserveBranches_Tracks(std::size_t size) {
     tTrack_EsdEntry.reserve(size);
     tTrack_X.reserve(size);
     tTrack_Y.reserve(size);
@@ -960,7 +960,7 @@ void AliAnalysisTaskEsd2Vector::ReserveBranches_Tracks(std::size_t size) {
 }
 
 // Clear the branches of the reconstructed tracks.
-void AliAnalysisTaskEsd2Vector::ClearBranches_Tracks() {
+void AliTaskEsd2Vector::ClearBranches_Tracks() {
     tTrack_EsdEntry.clear();
     tTrack_X.clear();
     tTrack_Y.clear();
@@ -1008,7 +1008,7 @@ void AliAnalysisTaskEsd2Vector::ClearBranches_Tracks() {
 
 // # Lambdas # //
 
-void AliAnalysisTaskEsd2Vector::ProcessLambdas() {
+void AliTaskEsd2Vector::ProcessLambdas() {
     const int n_v0s = fESD->GetNumberOfV0s();
     for (int v0_entry = 0; v0_entry < n_v0s; ++v0_entry) {
         auto* v0 = fESD->GetV0(v0_entry);
@@ -1114,7 +1114,7 @@ void AliAnalysisTaskEsd2Vector::ProcessLambdas() {
     }
 }
 
-void AliAnalysisTaskEsd2Vector::ReserveBranches_Lambdas(std::size_t size) {
+void AliTaskEsd2Vector::ReserveBranches_Lambdas(std::size_t size) {
     tLambda_EsdEntry.reserve(size);
     tLambda_Decay_X.reserve(size);
     tLambda_Decay_Y.reserve(size);
@@ -1150,7 +1150,7 @@ void AliAnalysisTaskEsd2Vector::ReserveBranches_Lambdas(std::size_t size) {
     }
 }
 
-void AliAnalysisTaskEsd2Vector::ClearBranches_Lambdas() {
+void AliTaskEsd2Vector::ClearBranches_Lambdas() {
     tLambda_EsdEntry.clear();
     tLambda_Decay_X.clear();
     tLambda_Decay_Y.clear();
@@ -1189,7 +1189,7 @@ void AliAnalysisTaskEsd2Vector::ClearBranches_Lambdas() {
 // # Injected Reactions # //
 
 // Store the in-memory values into the tree branches.
-void AliAnalysisTaskEsd2Vector::ProcessInjectedReactions() {
+void AliTaskEsd2Vector::ProcessInjectedReactions() {
     ReserveBranches_Injected();
     for (int r = 0; r < Const::NReactionsPerEvent; ++r) {
         tInjected_ReactionID.emplace_back(fEvVec_ReactionID[fEventNumberInFile][r]);
@@ -1203,7 +1203,7 @@ void AliAnalysisTaskEsd2Vector::ProcessInjectedReactions() {
 }
 
 // Copy to working directory the respective `sim.log` that corresponds to the `RunNumber+DirNumber` that's being analyzed.
-void AliAnalysisTaskEsd2Vector::BringSignalLogs() {
+void AliTaskEsd2Vector::BringSignalLogs() {
 
     TGrid* alien = nullptr;
     if (gGrid == nullptr) {
@@ -1238,7 +1238,7 @@ void AliAnalysisTaskEsd2Vector::BringSignalLogs() {
 
 // Read the anti-sexaquark and struck nucleon kinematics for each injected reaction
 // from the `sim.log` file that corresponds to an entire dir number into memory.
-bool AliAnalysisTaskEsd2Vector::ReadSignalLogs() {
+bool AliTaskEsd2Vector::ReadSignalLogs() {
 
     TString new_path = TString::Format("%s/%s", gSystem->pwd(), fSignalLog_NewBasename.Data());
     AliInfoF("Opening file %s ...", new_path.Data());
@@ -1304,7 +1304,7 @@ bool AliAnalysisTaskEsd2Vector::ReadSignalLogs() {
 }
 
 // Reserve injected reactions-related vectors' memory allocation.
-void AliAnalysisTaskEsd2Vector::ReserveBranches_Injected() {
+void AliTaskEsd2Vector::ReserveBranches_Injected() {
     tInjected_ReactionID.reserve(Const::NReactionsPerEvent);
     tInjected_Px.reserve(Const::NReactionsPerEvent);
     tInjected_Py.reserve(Const::NReactionsPerEvent);
@@ -1315,7 +1315,7 @@ void AliAnalysisTaskEsd2Vector::ReserveBranches_Injected() {
 }
 
 // Clear the branches of the injected reactions.
-void AliAnalysisTaskEsd2Vector::ClearBranches_Injected() {
+void AliTaskEsd2Vector::ClearBranches_Injected() {
     tInjected_ReactionID.clear();
     tInjected_Px.clear();
     tInjected_Py.clear();

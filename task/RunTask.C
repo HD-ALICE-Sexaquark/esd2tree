@@ -14,24 +14,24 @@
 #include <AliMultSelectionTask.h>
 #include <AliPhysicsSelectionTask.h>
 
-#include "AliAnalysisTaskEsd2Vector.h"
+#include "AliTaskEsd2Vector.h"
 
-void runAnalysis(const TString &Mode,            // "local", "grid"
-                 const TString &InputPath,       // what comes before the RN
-                 const TString &ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
-                                                 // for signal MC: "LHC23l1a3", "LHC23l1b3"
-                                                 // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
-                 int RunNumber,                  // single run number
-                 /* only valid when "local" or "grid+test" */
-                 int NDirs = 1,  // for MC: number of subdirs per run
-                                 // for data: number of dirs that share same prefix (to be used with `Grid_CustomDataPattern`)
-                 /* only valid when "local" */
-                 long long Local_LimitToNEvents = 0,  // 0 means all events
-                 /* only valid when "grid" */
-                 bool Grid_TestMode = false,                 //
-                 const TString &Grid_WorkingDir = "",        //
-                 int Grid_CustomSplitMaxNFiles = 0,          // 0 means default
-                 const TString &Grid_CustomDataPattern = ""  // what comes after the RN, empty means default
+void RunTask(const TString &Mode,            // "local", "grid"
+             const TString &InputPath,       // what comes before the RN
+             const TString &ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
+                                             // for signal MC: "LHC23l1a3", "LHC23l1b3"
+                                             // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
+             int RunNumber,                  // single run number
+             /* only valid when "local" or "grid+test" */
+             int NDirs = 1,  // for MC: number of subdirs per run
+                             // for data: number of dirs that share same prefix (to be used with `Grid_CustomDataPattern`)
+             /* only valid when "local" */
+             long long Local_LimitToNEvents = 0,  // 0 means all events
+             /* only valid when "grid" */
+             bool Grid_TestMode = false,                 //
+             const TString &Grid_WorkingDir = "",        //
+             int Grid_CustomSplitMaxNFiles = 0,          // 0 means default
+             const TString &Grid_CustomDataPattern = ""  // what comes after the RN, empty means default
 ) {
 
     // # Derive Options # //
@@ -58,7 +58,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Vector");
 
-    std::cout << "INFO  !! runAnalysis.C !! Created AliAnalysisManager" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Created AliAnalysisManager" << '\n';
 
     // # Grid Connection # //
 
@@ -90,7 +90,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
         mgr->SetGridHandler(alienHandler);
 
-        std::cout << "INFO  !! runAnalysis.C !! Passed grid connection" << '\n';
+        std::cout << "INFO  !! RunTask.C !! Passed grid connection" << '\n';
     }
 
     // # Input Handlers # //
@@ -106,7 +106,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         mgr->SetMCtruthEventHandler(mcH);
     }
 
-    std::cout << "INFO  !! runAnalysis.C !! Passed creation of input handlers" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Passed creation of input handlers" << '\n';
 
     // # Add Helper Tasks # //
 
@@ -151,25 +151,25 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
     if (TaskPIDqa == nullptr) return;
      */
 
-    std::cout << "INFO  !! runAnalysis.C !! Passed addition of helper tasks" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Passed addition of helper tasks" << '\n';
 
     // # Add Main Task # //
 
     gInterpreter->LoadMacro("AliAnalysisTaskEsd2Vector.cxx++g");
 
     TString TaskEsd2Vector_Options = TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC);
-    AliAnalysisTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliAnalysisTaskEsd2Vector *>(  //
+    AliTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliTaskEsd2Vector *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options));
     if (TaskEsd2Vector == nullptr) return;
 
-    std::cout << "INFO  !! runAnalysis.C !! Passed addition of main task" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Passed addition of main task" << '\n';
 
     // # Init Analysis Manager # //
 
     mgr->SetDebugLevel(0);
     if (!mgr->InitAnalysis()) return;
 
-    std::cout << "INFO  !! runAnalysis.C !! Passed InitAnalysis" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Passed InitAnalysis" << '\n';
 
     // # Start Analysis # //
 
@@ -190,7 +190,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         if (IsMC) {
             for (int DN = 1; DN <= NDirs; ++DN) {
                 FilePath = TString::Format("%s/%i/%03i/AliESDs.root", InputPath.Data(), RunNumber, DN);
-                std::cout << "INFO  !! runAnalysis.C !! Adding file " << FilePath << '\n';
+                std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }
         } else {  // data
@@ -202,7 +202,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
                 if (!one_dir->IsDirectory()) continue;
                 FilePath = TString::Format("%s/%s/AliESDs.root", top_path.Data(), one_dir->GetName());
                 if (gSystem->AccessPathName(FilePath)) continue;
-                std::cout << "INFO  !! runAnalysis.C !! Adding file " << FilePath << '\n';
+                std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }
         }
@@ -212,5 +212,5 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
             mgr->StartAnalysis("local", chain, Local_LimitToNEvents);  // read first NEvents
     }
 
-    std::cout << "INFO  !! runAnalysis.C !! Passed StartAnalysis" << '\n';
+    std::cout << "INFO  !! RunTask.C !! Passed StartAnalysis" << '\n';
 }

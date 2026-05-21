@@ -14,7 +14,7 @@
 #include <AliESDtrack.h>
 #include <AliEventCuts.h>
 
-#include "AliAnalysisTaskEsd2Vector_Const.h"
+#include "AliTaskEsd2Vector_Const.h"
 
 class TClass;
 class TList;
@@ -32,16 +32,16 @@ class AliMCEvent;
 class AliVVertex;
 class AliPIDResponse;
 
-class AliAnalysisTaskEsd2Vector final : public AliAnalysisTaskSE {
+class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
    public:
-    AliAnalysisTaskEsd2Vector(const char* name);
-    AliAnalysisTaskEsd2Vector();
-    ~AliAnalysisTaskEsd2Vector();
+    AliTaskEsd2Vector(const char* name);
+    AliTaskEsd2Vector();
+    ~AliTaskEsd2Vector();
 
-    AliAnalysisTaskEsd2Vector(const AliAnalysisTaskEsd2Vector&) = delete;
-    AliAnalysisTaskEsd2Vector& operator=(const AliAnalysisTaskEsd2Vector&) = delete;
-    AliAnalysisTaskEsd2Vector(AliAnalysisTaskEsd2Vector&&) = delete;
-    AliAnalysisTaskEsd2Vector& operator=(AliAnalysisTaskEsd2Vector&&) = delete;
+    AliTaskEsd2Vector(const AliTaskEsd2Vector&) = delete;
+    AliTaskEsd2Vector& operator=(const AliTaskEsd2Vector&) = delete;
+    AliTaskEsd2Vector(AliTaskEsd2Vector&&) = delete;
+    AliTaskEsd2Vector& operator=(AliTaskEsd2Vector&&) = delete;
 
     // Settings ~ stored in Analysis Manager //
     void Initialize(bool is_mc, bool is_signal_mc = false);
@@ -288,5 +288,5 @@ class AliAnalysisTaskEsd2Vector final : public AliAnalysisTaskSE {
     std::vector<int> tLambda_Neg_McEntry;  //!
     std::vector<int> tLambda_Pos_McEntry;  //!
 
-    ClassDef(AliAnalysisTaskEsd2Vector, 2);  // = number of persistent members
+    ClassDef(AliTaskEsd2Vector, 2);  // = number of persistent members
 };

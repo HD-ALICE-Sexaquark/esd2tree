@@ -1,10 +1,12 @@
 #!/bin/bash
 
-if [[ -z ${E2V_TASK_DIR} ]]; then echo "missing E2V_TASK_DIR" ; exit 1; fi
+set -euo pipefail
+
+if [[ -z ${E2V_TASK_DIR:-} ]]; then echo "error: missing env. var. E2V_TASK_DIR" ; exit 1; fi
 if [[ $# -ne 1 ]]; then echo "usage: ./exec.sh <config_file>"; exit 1; fi
 config_file=$1
 
-source ${config_file}
+source "${config_file}"
 echo "exec.sh :: from config_file : ${config_file}"
 echo "exec.sh ::   MODE                 = \"${MODE}\""
 echo "exec.sh ::   INPUT_PATH           = \"${INPUT_PATH}\""
@@ -19,16 +21,16 @@ echo "exec.sh ::   GRID_CUSTOM_PATTERN  = \"${GRID_CUSTOM_PATTERN}\""
 echo "exec.sh ::   ATTEMPT_NAME         = ${ATTEMPT_NAME}"
 
 attempt_dir=${E2V_TASK_DIR}/attempts/${ATTEMPT_NAME}
-mkdir -p ${attempt_dir}
+mkdir -p "${attempt_dir}"
 
-cp ${E2V_TASK_DIR}/AliAnalysisTaskEsd2Vector.cxx ${attempt_dir}/
-cp ${E2V_TASK_DIR}/AliAnalysisTaskEsd2Vector.h ${attempt_dir}/
-cp ${E2V_TASK_DIR}/AliAnalysisTaskEsd2Vector_Const.h ${attempt_dir}/
-cp ${E2V_TASK_DIR}/AliAnalysisTaskEsd2Vector_Cuts.h ${attempt_dir}/
-cp ${E2V_TASK_DIR}/AddTaskEsd2Vector.C ${attempt_dir}/
-cp ${E2V_TASK_DIR}/runAnalysis.C ${attempt_dir}/
+cd "${attempt_dir}"
 
-cd ${attempt_dir} || exit
+ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector.cxx" .
+ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector.h" .
+ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector_Const.h" .
+ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector_Cuts.h" .
+ln -sf "${E2V_TASK_DIR}/AddTaskEsd2Vector.C" .
+ln -sf "${E2V_TASK_DIR}/RunTask.C" .
 
 analysis_options="("
 analysis_options+="\"${MODE}\","
@@ -43,8 +45,8 @@ analysis_options+="${GRID_CUSTOM_SPLIT},"
 analysis_options+="\"${GRID_CUSTOM_PATTERN}\""
 analysis_options+=")"
 
-aliroot_command="aliroot -l -b -q runAnalysis.C${analysis_options}"
+aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
 echo ${aliroot_command}
 ${aliroot_command} 2>&1 | tee analysis.log
 
-cd ${E2V_TASK_DIR} || exit
+cd "${E2V_TASK_DIR}"

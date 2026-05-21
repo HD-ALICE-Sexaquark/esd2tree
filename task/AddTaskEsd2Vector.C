@@ -1,13 +1,13 @@
 #include <AliAnalysisManager.h>
 
-#include "AliAnalysisTaskEsd2Vector.h"
+#include "AliTaskEsd2Vector.h"
 
-AliAnalysisTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
+AliTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
 
     AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
     if (mgr == nullptr) return nullptr;
 
-    auto *task = new AliAnalysisTaskEsd2Vector("AliAnalysisTaskEsd2Vector");
+    auto *task = new AliTaskEsd2Vector("AliTaskEsd2Vector");
     if (task == nullptr) return nullptr;
 
     // NOTE: `SelectCollisionCandidates` omitted because it's done within the task's `PassesEventSelection`
