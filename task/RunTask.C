@@ -69,8 +69,9 @@ void RunTask(const TString &Mode,            // "local", "grid"
         alienHandler->SetCheckCopy(false);
         alienHandler->AddIncludePath("-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include");
         alienHandler->SetAdditionalLibs(
-            "AliAnalysisTaskEsd2Vector.cxx AliAnalysisTaskEsd2Vector.h AliAnalysisTaskEsd2Vector_Const.h AliAnalysisTaskEsd2Vector_Cuts.h");
-        alienHandler->SetAnalysisSource("AliAnalysisTaskEsd2Vector.cxx");
+            "AliTaskEsd2Vector.cxx AliTaskEsd2Vector.h Constants.hpp E2R_Cuts.hpp E2R_Event.hpp E2R_InjectedSexa.hpp E2R_Lambda.hpp "
+            "E2R_McParticle.hpp E2R_Track.hpp");
+        alienHandler->SetAnalysisSource("AliTaskEsd2Vector.cxx");
         alienHandler->SetAliPhysicsVersion("vAN-20250907_O2-1");
         alienHandler->SetExecutableCommand("aliroot -l -q -b");
         alienHandler->SetGridDataDir(InputPath);
@@ -80,7 +81,7 @@ void RunTask(const TString &Mode,            // "local", "grid"
         alienHandler->SetTTL(3600);
         alienHandler->SetOutputToRunNo(static_cast<int>(true));
         alienHandler->SetDefaultOutputs(false);
-        alienHandler->SetOutputFiles("AnalysisResults.root");
+        alienHandler->SetOutputFiles("AnalysisResults.root EventsRNT.root");
         alienHandler->SetOutputArchive("");
         alienHandler->SetKeepLogs(true);
         alienHandler->SetMergeViaJDL(false);
@@ -155,7 +156,7 @@ void RunTask(const TString &Mode,            // "local", "grid"
 
     // # Add Main Task # //
 
-    gInterpreter->LoadMacro("AliAnalysisTaskEsd2Vector.cxx++g");
+    gInterpreter->LoadMacro("AliTaskEsd2Vector.cxx++g");
 
     TString TaskEsd2Vector_Options = TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC);
     AliTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliTaskEsd2Vector *>(  //

@@ -14,11 +14,8 @@ AliTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
     task->Initialize(is_mc, is_signal_mc);
 
     mgr->AddTask(task);
-
     mgr->ConnectInput(task, 0, mgr->GetCommonInputContainer());
-
     mgr->ConnectOutput(task, 1, mgr->CreateContainer("QA", TList::Class(), mgr->kOutputContainer, mgr->GetCommonFileName()));
-    mgr->ConnectOutput(task, 2, mgr->CreateContainer("Events", TTree::Class(), mgr->kOutputContainer, mgr->GetCommonFileName()));
 
     return task;
 }

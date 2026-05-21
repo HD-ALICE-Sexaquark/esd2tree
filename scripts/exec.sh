@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-if [[ -z ${E2V_TASK_DIR:-} ]]; then echo "error: missing env. var. E2V_TASK_DIR" ; exit 1; fi
+if [[ -z ${E2R_TASK_DIR:-} ]]; then echo "error: missing env. var. E2R_TASK_DIR" ; exit 1; fi
 if [[ $# -ne 1 ]]; then echo "usage: ./exec.sh <config_file>"; exit 1; fi
 config_file=$1
 
@@ -20,17 +20,22 @@ echo "exec.sh ::   GRID_CUSTOM_SPLIT    = ${GRID_CUSTOM_SPLIT}"
 echo "exec.sh ::   GRID_CUSTOM_PATTERN  = \"${GRID_CUSTOM_PATTERN}\""
 echo "exec.sh ::   ATTEMPT_NAME         = ${ATTEMPT_NAME}"
 
-attempt_dir=${E2V_TASK_DIR}/attempts/${ATTEMPT_NAME}
+attempt_dir=${E2R_TASK_DIR}/attempts/${ATTEMPT_NAME}
 mkdir -p "${attempt_dir}"
 
 cd "${attempt_dir}"
 
-ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector.cxx" .
-ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector.h" .
-ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector_Const.h" .
-ln -sf "${E2V_TASK_DIR}/AliTaskEsd2Vector_Cuts.h" .
-ln -sf "${E2V_TASK_DIR}/AddTaskEsd2Vector.C" .
-ln -sf "${E2V_TASK_DIR}/RunTask.C" .
+cp -v "${E2R_ROOT_DIR}/common/Constants.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_Event.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_InjectedSexa.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_Lambda.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_McParticle.hpp" .
+cp -v "${E2R_ROOT_DIR}/common/E2R_Track.hpp" .
+cp -v "${E2R_TASK_DIR}/AliTaskEsd2Vector.cxx" .
+cp -v "${E2R_TASK_DIR}/AliTaskEsd2Vector.h" .
+cp -v "${E2R_TASK_DIR}/AddTaskEsd2Vector.C" .
+cp -v "${E2R_TASK_DIR}/RunTask.C" .
 
 analysis_options="("
 analysis_options+="\"${MODE}\","
@@ -45,8 +50,10 @@ analysis_options+="${GRID_CUSTOM_SPLIT},"
 analysis_options+="\"${GRID_CUSTOM_PATTERN}\""
 analysis_options+=")"
 
+ls -lrth
+
 aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
 echo ${aliroot_command}
 ${aliroot_command} 2>&1 | tee analysis.log
 
-cd "${E2V_TASK_DIR}"
+cd "${E2R_TASK_DIR}"
