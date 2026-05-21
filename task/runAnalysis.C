@@ -1,5 +1,6 @@
 #include <TChain.h>
 #include <TString.h>
+#include <TSystem.h>
 #include <TSystemDirectory.h>
 
 #include <AliAnalysisAlien.h>
@@ -9,6 +10,7 @@
 #include <AliMCEventHandler.h>
 
 #include <AliAnalysisTaskPIDResponse.h>
+// #include <AliAnalysisTaskPIDqa.h> // COMMENTED OUT: only needed for debug purposes
 #include <AliMultSelectionTask.h>
 #include <AliPhysicsSelectionTask.h>
 
@@ -20,7 +22,7 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
                                                  // for signal MC: "LHC23l1a3", "LHC23l1b3"
                                                  // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
                  int RunNumber,                  // single run number
-                 /* valid when "local" or "grid+test" */
+                 /* only valid when "local" or "grid+test" */
                  int NDirs = 1,  // for MC: number of subdirs per run
                                  // for data: number of dirs that share same prefix (to be used with `Grid_CustomDataPattern`)
                  /* only valid when "local" */
@@ -32,35 +34,35 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
                  const TString &Grid_CustomDataPattern = ""  // what comes after the RN, empty means default
 ) {
 
-    /* Derive Options */
+    // # Derive Options # //
 
-    bool IsMC{ProductionName.Contains("LHC2")};
-    bool IsSignalMC{ProductionName.Contains("23l1")};
+    bool IsMC = ProductionName.Contains("LHC2");
+    bool IsSignalMC = ProductionName.Contains("23l1");
 
-    int SplitMaxNFiles{60};         // default for data
+    int SplitMaxNFiles = 60;        // default for data
     if (IsMC) SplitMaxNFiles = 10;  // default for MC
     if (Grid_CustomSplitMaxNFiles > 0) SplitMaxNFiles = Grid_CustomSplitMaxNFiles;
 
-    int PassNumber{3};  // default for 18qr and anchored sims
+    int PassNumber = 3;  // default for 18qr and anchored sims
     if (ProductionName == "LHC15o" || ProductionName == "LHC20j6a" || ProductionName == "LHC23l1b3") PassNumber = 2;
 
-    TString GridDataPattern{TString::Format("/pass%i/*/AliESDs.root", PassNumber)};  // default for data
-    if (IsMC) GridDataPattern = "/*/AliESDs.root";                                   // default for MC
+    TString GridDataPattern = TString::Format("/pass%i/*/AliESDs.root", PassNumber);  // default for data
+    if (IsMC) GridDataPattern = "/*/AliESDs.root";                                    // default for MC
     if (Grid_CustomDataPattern.Length() > 0) GridDataPattern = Grid_CustomDataPattern;
 
-    /* Start */
+    // # Start # //
 
     gInterpreter->ProcessLine(".include $ROOTSYS/include");
     gInterpreter->ProcessLine(".include $ALICE_ROOT/include");
     gInterpreter->ProcessLine(".include $ALICE_PHYSICS/include");
 
-    AliAnalysisManager *mgr{new AliAnalysisManager("Esd2Vector")};
+    AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Vector");
 
     std::cout << "INFO  !! runAnalysis.C !! Created AliAnalysisManager" << '\n';
 
-    /* Grid Connection */
+    // # Grid Connection # //
 
-    AliAnalysisAlien *alienHandler{nullptr};
+    AliAnalysisAlien *alienHandler = nullptr;
 
     if (Mode == "grid") {
         alienHandler = new AliAnalysisAlien();
@@ -91,13 +93,13 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
         std::cout << "INFO  !! runAnalysis.C !! Passed grid connection" << '\n';
     }
 
-    /* Input Handlers */
+    // # Input Handlers # //
 
-    AliESDInputHandler *esdH{new AliESDInputHandler()};
+    AliESDInputHandler *esdH = new AliESDInputHandler();
     esdH->SetNeedField();  // necessary to get GoldenChi2
     mgr->SetInputEventHandler(esdH);
 
-    AliMCEventHandler *mcH{nullptr};
+    AliMCEventHandler *mcH = nullptr;
     if (IsMC) {
         mcH = new AliMCEventHandler();
         mcH->SetReadTR(false);
@@ -106,61 +108,73 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
 
     std::cout << "INFO  !! runAnalysis.C !! Passed creation of input handlers" << '\n';
 
-    /* Add Helper Tasks */
+    // # Add Helper Tasks # //
 
-    // Reference: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel
-    bool applyPileupCuts{false};
-    TString TaskPhysicsSelection_Options{TString::Format("(%i, %i)", (int)IsMC, (int)applyPileupCuts)};
-    AliPhysicsSelectionTask *TaskPhysicsSelection{reinterpret_cast<AliPhysicsSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options)  //
-        )};
+    // Reference:
+    // https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGtoolsPhysSel
+    bool applyPileupCuts = false;
+    TString TaskPhysicsSelection_Options = TString::Format("(%i, %i)", (int)IsMC, (int)applyPileupCuts);
+    auto *TaskPhysicsSelection = reinterpret_cast<AliPhysicsSelectionTask *>(
+        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options));
     if (TaskPhysicsSelection == nullptr) return;
 
-    TString TaskCentrality_Options{""};  // nothing
-    AliMultSelectionTask *TaskCentrality{reinterpret_cast<AliMultSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options)  //
-        )};
+    TString TaskCentrality_Options = "";  // nothing
+    auto *TaskCentrality = reinterpret_cast<AliMultSelectionTask *>(
+        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options));
     if (TaskCentrality == nullptr) return;
 
     // References:
     // https://twiki.cern.ch/twiki/bin/viewauth/ALICE/PIDInAnalysis
     // https://twiki.cern.ch/twiki/bin/viewauth/ALICE/TPCSplines
     // https://alisw.github.io/git-advanced/#how-to-use-large-data-files-for-analysis
-    bool tuneOnData{IsMC};
-    TString pathTPCPIDResponse{AliDataFile::GetFileNameOADB("COMMON/PID/data/TPCPIDResponseOADB_pileupCorr.root")};
-    TString TaskPIDResponse_Options{
-        TString::Format("(%i, 1, %i, \"\", 0, "
-                        "\"TPC-OADB:%s;TPC-Maps:$ALICE_PHYSICS/OADB/COMMON/PID/data/TPCetaMaps_pileupCorr.root\")",
-                        (int)IsMC, (int)tuneOnData, pathTPCPIDResponse.Data())};
-    AliAnalysisTaskPIDResponse *TaskPIDResponse{reinterpret_cast<AliAnalysisTaskPIDResponse *>(
-        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options))};
+    Bool_t pid_is_mc = IsMC;
+    Bool_t pid_auto_mc_esd = kTRUE;
+    Bool_t pid_tune_on_data = IsMC;
+    TString pid_reco_pass = "";
+    Bool_t pid_cache_pid = kFALSE;
+    TString pid_path_oadb =
+        AliDataFile::GetFileNameOADB("COMMON/PID/data/TPCPIDResponseOADB_pileupCorr.root");  // NOTE: large storage file not in common repos
+    TString pid_path_eta_maps = "$ALICE_PHYSICS/OADB/COMMON/PID/data/TPCetaMaps_pileupCorr.root";
+    TString pid_det_response = TString::Format("TPC-OADB:%s;TPC-Maps:%s", pid_path_oadb.Data(), pid_path_eta_maps.Data());
+    TString TaskPIDResponse_Options = TString::Format("(%i, %i, %i, \"%s\", %i, \"%s\")", (int)pid_is_mc, (int)pid_auto_mc_esd, (int)pid_tune_on_data,
+                                                      pid_reco_pass.Data(), pid_cache_pid, pid_det_response.Data());
+    auto *TaskPIDResponse = reinterpret_cast<AliAnalysisTaskPIDResponse *>(
+        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
     if (TaskPIDResponse == nullptr) return;
+
+    /*
+    // COMMENTED OUT: only needed for debug purposes
+    // Reference:
+    // https://twiki.cern.ch/twiki/bin/view/ALICE/PIDInAnalysis#Adding_the_PIDqa_task
+    auto *TaskPIDqa = reinterpret_cast<AliAnalysisTaskPIDqa *>(  //
+        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDqa.C"));
+    if (TaskPIDqa == nullptr) return;
+     */
 
     std::cout << "INFO  !! runAnalysis.C !! Passed addition of helper tasks" << '\n';
 
-    /* Add Main Task */
+    // # Add Main Task # //
 
     gInterpreter->LoadMacro("AliAnalysisTaskEsd2Vector.cxx++g");
 
-    TString TaskEsd2Vector_Options{TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC)};
-    AliAnalysisTaskEsd2Vector *TaskEsd2Vector{reinterpret_cast<AliAnalysisTaskEsd2Vector *>(  //
-        gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options)            //
-        )};
+    TString TaskEsd2Vector_Options = TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC);
+    AliAnalysisTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliAnalysisTaskEsd2Vector *>(  //
+        gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options));
     if (TaskEsd2Vector == nullptr) return;
 
     std::cout << "INFO  !! runAnalysis.C !! Passed addition of main task" << '\n';
 
-    /* Init Analysis Manager */
+    // # Init Analysis Manager # //
 
     mgr->SetDebugLevel(0);
     if (!mgr->InitAnalysis()) return;
 
     std::cout << "INFO  !! runAnalysis.C !! Passed InitAnalysis" << '\n';
 
-    /* Start Analysis */
+    // # Start Analysis # //
 
-    TChain *chain{nullptr};
-    TString FilePath{""};
+    TChain *chain = nullptr;
+    TString FilePath = "";
 
     if (Mode == "grid") {
         if (Grid_TestMode) {
@@ -174,16 +188,16 @@ void runAnalysis(const TString &Mode,            // "local", "grid"
     } else {  // local mode
         chain = new TChain("esdTree");
         if (IsMC) {
-            for (int DN{1}; DN <= NDirs; ++DN) {
+            for (int DN = 1; DN <= NDirs; ++DN) {
                 FilePath = TString::Format("%s/%i/%03i/AliESDs.root", InputPath.Data(), RunNumber, DN);
                 std::cout << "INFO  !! runAnalysis.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }
         } else {  // data
-            TString top_path{TString::Format("%s/000%i/pass%i", InputPath.Data(), RunNumber, PassNumber)};
+            TString top_path = TString::Format("%s/000%i/pass%i", InputPath.Data(), RunNumber, PassNumber);
             TSystemDirectory top_dir(top_path, top_path);
             for (auto *file : *top_dir.GetListOfFiles()) {
-                auto *one_dir{dynamic_cast<TSystemDirectory *>(file)};
+                auto *one_dir = dynamic_cast<TSystemDirectory *>(file);
                 if (strcmp(one_dir->GetName(), ".") == 0 || strcmp(one_dir->GetName(), "..") == 0) continue;
                 if (!one_dir->IsDirectory()) continue;
                 FilePath = TString::Format("%s/%s/AliESDs.root", top_path.Data(), one_dir->GetName());

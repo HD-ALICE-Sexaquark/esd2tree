@@ -4,13 +4,13 @@
 
 AliAnalysisTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
 
-    AliAnalysisManager *mgr{AliAnalysisManager::GetAnalysisManager()};
+    AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
     if (mgr == nullptr) return nullptr;
 
-    auto *task{new AliAnalysisTaskEsd2Vector("AliAnalysisTaskEsd2Vector")};
+    auto *task = new AliAnalysisTaskEsd2Vector("AliAnalysisTaskEsd2Vector");
     if (task == nullptr) return nullptr;
 
-    task->SelectCollisionCandidates(AliVEvent::kINT7);  // from `AliPhysicsSelectionTask`
+    // NOTE: `SelectCollisionCandidates` omitted because it's done within the task's `PassesEventSelection`
     task->Initialize(is_mc, is_signal_mc);
 
     mgr->AddTask(task);
