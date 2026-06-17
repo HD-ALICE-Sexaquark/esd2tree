@@ -2,7 +2,11 @@
 
 set -euo pipefail
 
-if [[ -z ${E2R_TASK_DIR:-} ]]; then echo "error: missing env. var. E2R_TASK_DIR" ; exit 1; fi
+# environment
+if [[ -z ${E2R_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2R_ROOT_DIR" ; exit 1; fi
+if [[ -z ${GRID_HOME_DIR:-} ]]; then echo "error: missing env. var. GRID_HOME_DIR" ; exit 1; fi
+
+# command-line arguments
 if [[ $# -ne 1 ]]; then echo "usage: ./exec.sh <config_file>"; exit 1; fi
 config_file=$1
 
@@ -14,46 +18,69 @@ echo "exec.sh ::   PRODUCTION_NAME      = \"${PRODUCTION_NAME}\""
 echo "exec.sh ::   RUN_NUMBER           = ${RUN_NUMBER}"
 echo "exec.sh ::   LOCAL_N_DIRS         = ${LOCAL_N_DIRS}"
 echo "exec.sh ::   LOCAL_LIMIT_N_EVENTS = ${LOCAL_LIMIT_N_EVENTS}"
-echo "exec.sh ::   GRID_TEST_MODE       = ${GRID_TEST_MODE}"
 echo "exec.sh ::   GRID_WORKING_DIR     = \"${GRID_WORKING_DIR}\""
-echo "exec.sh ::   GRID_CUSTOM_SPLIT    = ${GRID_CUSTOM_SPLIT}"
-echo "exec.sh ::   GRID_CUSTOM_PATTERN  = \"${GRID_CUSTOM_PATTERN}\""
 echo "exec.sh ::   ATTEMPT_NAME         = ${ATTEMPT_NAME}"
 
-attempt_dir=${E2R_TASK_DIR}/attempts/${ATTEMPT_NAME}
-mkdir -p "${attempt_dir}"
+current_dir=${PWD}
 
-cd "${attempt_dir}"
+arr_custom_xml=("")
+if [[ ${MODE} == "grid" && ${PRODUCTION_NAME} =~ LHC1* ]]; then # data real?
+    cd "${E2R_ROOT_DIR}"
+    xml_rn_dir=xml/${PRODUCTION_NAME}/${RUN_NUMBER} # relative to E2R_ROOT_DIR
+    if [[ -d ${xml_rn_dir} ]]; then # run number big?
+        mapfile -t arr_custom_xml < <(find "${xml_rn_dir}" -name "*.xml")
+    fi
+    cd "${current_dir}"
+fi
 
-cp -v "${E2R_ROOT_DIR}/common/Constants.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_Event.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_InjectedSexa.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_Lambda.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_McParticle.hpp" .
-cp -v "${E2R_ROOT_DIR}/common/E2R_Track.hpp" .
-cp -v "${E2R_TASK_DIR}/AliTaskEsd2Vector.cxx" .
-cp -v "${E2R_TASK_DIR}/AliTaskEsd2Vector.h" .
-cp -v "${E2R_TASK_DIR}/AddTaskEsd2Vector.C" .
-cp -v "${E2R_TASK_DIR}/RunTask.C" .
+for index in "${!arr_custom_xml[@]}"; do
 
-analysis_options="("
-analysis_options+="\"${MODE}\","
-analysis_options+="\"${INPUT_PATH}\","
-analysis_options+="\"${PRODUCTION_NAME}\","
-analysis_options+="${RUN_NUMBER},"
-analysis_options+="${LOCAL_N_DIRS},"
-analysis_options+="${LOCAL_LIMIT_N_EVENTS},"
-analysis_options+="${GRID_TEST_MODE},"
-analysis_options+="\"${GRID_WORKING_DIR}\","
-analysis_options+="${GRID_CUSTOM_SPLIT},"
-analysis_options+="\"${GRID_CUSTOM_PATTERN}\""
-analysis_options+=")"
+    custom_xml=""
+    attempt_suffix=""
+    if [[ ${arr_custom_xml[${index}]} != "" ]];then
+        custom_xml=${GRID_HOME_DIR}/${arr_custom_xml[${index}]} # mirrored at grid
+        attempt_suffix="_$((index + 1))"
+    fi
 
-ls -lrth
+    attempt_dir=${E2R_ROOT_DIR}/task/attempts/${ATTEMPT_NAME}_${RUN_NUMBER}${attempt_suffix}
+    mkdir -p "${attempt_dir}"
 
-aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
-echo ${aliroot_command}
-${aliroot_command} 2>&1 | tee analysis.log
+    echo "exec.sh ::   >> GRID_CUSTOM_XML   = \"${custom_xml}\""
+    echo "exec.sh ::   >> ATTEMPT_DIR       = ${attempt_dir}"
 
-cd "${E2R_TASK_DIR}"
+    cd "${attempt_dir}"
+
+    cp "${E2R_ROOT_DIR}/task/RunTask.C" .
+    cp "${E2R_ROOT_DIR}/task/AddTaskEsd2Vector.C" .
+    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.cxx" .
+    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.h" .
+    cp "${E2R_ROOT_DIR}/common/Constants.hpp" .
+    cp "${E2R_ROOT_DIR}/common/Framework.hpp" .
+    cp "${E2R_ROOT_DIR}/common/Math.hpp" .
+    cp "${E2R_ROOT_DIR}/common/Schema_Events.hpp" .
+    cp "${E2R_ROOT_DIR}/common/POD_LinkDef.h" .
+    cp "${E2R_ROOT_DIR}/common/POD_Event.hpp" .
+    cp "${E2R_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
+    cp "${E2R_ROOT_DIR}/common/POD_McParticle.hpp" .
+    cp "${E2R_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
+    cp "${E2R_ROOT_DIR}/common/POD_Track.hpp" .
+    cp "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
+
+    analysis_options="("
+    analysis_options+="\"${MODE}\","
+    analysis_options+="\"${INPUT_PATH}\","
+    analysis_options+="\"${PRODUCTION_NAME}\","
+    analysis_options+="${RUN_NUMBER},"
+    analysis_options+="${LOCAL_N_DIRS},"
+    analysis_options+="${LOCAL_LIMIT_N_EVENTS},"
+    analysis_options+="\"${GRID_WORKING_DIR}\","
+    analysis_options+="\"${custom_xml}\""
+    analysis_options+=")"
+
+    aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
+    echo "${aliroot_command}"
+    ${aliroot_command} 2>&1 | tee analysis.log
+done
+
+# go back
+cd "${current_dir}"

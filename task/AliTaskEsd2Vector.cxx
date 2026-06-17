@@ -1,6 +1,6 @@
-#include "AliTaskEsd2Vector.h"
-
+#include <cstdint>
 #include <fstream>
+#include <memory>
 #include <sstream>
 #include <string>
 
@@ -10,10 +10,6 @@
 #include <TList.h>
 #include <TObjString.h>
 #include <TSystem.h>
-
-#include <ROOT/RNTupleModel.hxx>
-#include <ROOT/RNTupleWriteOptions.hxx>
-#include <ROOT/RNTupleWriter.hxx>
 
 #include <AliAnalysisManager.h>
 #include <AliAnalysisTaskSE.h>
@@ -30,6 +26,9 @@
 
 #include "Constants.hpp"
 #include "E2R_Cuts.hpp"
+#include "Math.hpp"
+
+#include "AliTaskEsd2Vector.h"
 
 ClassImp(AliTaskEsd2Vector);
 
@@ -38,14 +37,14 @@ AliTaskEsd2Vector::AliTaskEsd2Vector(const char *name)
     : AliAnalysisTaskSE{name},
       //
       fIsMC{false},
-      fIsSignalMC{false},
+      fIsMC_DedicatedSexaquark{false},
+      fIsFirstEvent{true},
       //
       fMC{nullptr},
       fMC_PrimaryVertex{nullptr},
       fESD{nullptr},
       fPrimaryVertex{nullptr},
       fPIDResponse{nullptr},
-      fEventCuts{},
       //
       fAliEnPath{""},
       fSignalLog_NewBasename{""},
@@ -65,12 +64,8 @@ AliTaskEsd2Vector::AliTaskEsd2Vector(const char *name)
       fHist_Tracks_Bookkeeping{nullptr},
       //
       fOutput_AltFile{nullptr},
-      fWriter{},
-      fEvent{},
-      fInjectedSexa{},
-      fMcParticle{},
-      fTrack{},
-      fLambda{} {
+      fOutput{},
+      fWriter{nullptr} {
     DefineInput(0, TChain::Class());
     DefineOutput(1, TList::Class());  // fOutputList
 }
@@ -80,35 +75,25 @@ AliTaskEsd2Vector::AliTaskEsd2Vector() : AliTaskEsd2Vector{""} {}
 
 // Destructor.
 // NOTE: if `TList::SetOwner(true)` was called, the TList destructor should delete all objects added to it.
-AliTaskEsd2Vector::~AliTaskEsd2Vector() {
-    delete fOutputList;
-    fWriter.reset();
-    if (fOutput_AltFile != nullptr) {
-        fOutput_AltFile->Close();
-        delete fOutput_AltFile;
-    }
-}
+AliTaskEsd2Vector::~AliTaskEsd2Vector() { delete fOutputList; }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Vector.C` macro.
-void AliTaskEsd2Vector::Initialize(bool is_mc, bool is_signal_mc) {
+void AliTaskEsd2Vector::Initialize(bool is_mc, bool is_sexa_mc, bool is_hdib_mc) {
     fIsMC = is_mc;
-    fIsSignalMC = is_signal_mc;
+    fIsMC_DedicatedSexaquark = is_sexa_mc;
+    fIsMC_DedicatedHdibaryon = is_hdib_mc;
     // print settings //
     AliInfo("Initializing...");
     AliInfo("Settings:");
     AliInfo("========");
-    AliInfoF(">> IsMC       = %i", fIsMC);
-    AliInfoF(">> IsSignalMC = %i", fIsSignalMC);
+    AliInfoF(">> IsMC                    = %i", fIsMC);
+    AliInfoF(">> IsMC_DedicatedSexaquark = %i", fIsMC_DedicatedSexaquark);
+    AliInfoF(">> IsMC_DedicatedHdibaryon = %i", fIsMC_DedicatedHdibaryon);
 }
 
 void AliTaskEsd2Vector::FinishTaskOutput() {
-    fWriter.reset();
-    if (fOutput_AltFile) {
-        fOutput_AltFile->Write();
-        fOutput_AltFile->Close();
-        delete fOutput_AltFile;
-        fOutput_AltFile = nullptr;
-    }
+    fWriter->fRNT_Writer.reset();
+    fOutput_AltFile->Write();
 }
 
 // # Executed at Runtime # //
@@ -126,25 +111,16 @@ void AliTaskEsd2Vector::UserCreateOutputObjects() {
 
     // Prepare output file //
 
-    fOutput_AltFile = TFile::Open("EventsRNT.root", "RECREATE");
+    fOutput_AltFile = std::make_unique<TFile>("EventsRNT.root", "RECREATE");
     if (!fOutput_AltFile || fOutput_AltFile->IsZombie()) AliFatal("Cannot open EventsRNT.root");
 
     // Prepare output RNTuple //
 
-    auto rnt_model = ROOT::RNTupleModel::Create();
-
-    CreateEventsBranches(rnt_model.get());
-    if (fIsMC) {
-        CreateMCBranches(rnt_model.get());
-        if (fIsSignalMC) CreateInjectedBranches(rnt_model.get());
-    }
-    CreateTracksBranches(rnt_model.get());
-    CreateLambdasBranches(rnt_model.get());
-
     ROOT::RNTupleWriteOptions rnt_opts;
     rnt_opts.SetCompression(ROOT::RCompressionSetting::EDefaults::kUseSmallest);
 
-    fWriter = ROOT::RNTupleWriter::Append(std::move(rnt_model), "Events", *fOutput_AltFile, rnt_opts);
+    fWriter =
+        std::make_unique<Framework::Writer>(fOutput.CreateModel(fIsMC, fIsMC_DedicatedSexaquark), E2R::Name_OutputRNT, *fOutput_AltFile, rnt_opts);
 
     // Prepare output list and histograms //
 
@@ -189,32 +165,35 @@ bool AliTaskEsd2Vector::UserNotify() {
     TObjArray *tokens = fAliEnPath.Tokenize("/");
     if (fIsMC) {
         // NOTES: path of MC (signal/gen.purp.) ends with format `.../297595/001/AliESDs.root`
-        *fEvent.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 3)))->GetString().Atoi();
-        *fEvent.DirNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 2)))->GetString().Atoi();
-        AliInfoF("Run Number = %04i", static_cast<int>(*fEvent.RunNumber));  // = 1
-        AliInfoF("Dir Number = %04i", static_cast<int>(*fEvent.DirNumber));  // = 1
-        if (fIsSignalMC) {
+        fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 3)))->GetString().Atoi();
+        fOutput.Event.DirNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 2)))->GetString().Atoi();
+        fOutput.Event.DirNumberB = 0;
+        AliInfoF("Run Number = %04i", static_cast<int>(fOutput.Event.RunNumber));  // = 1
+        AliInfoF("Dir Number = %04i", static_cast<int>(fOutput.Event.DirNumber));  // = 1
+        if (fIsMC_DedicatedSexaquark) {
             BringSignalLogs();
             ReadSignalLogs();
         }
     } else {
         // NOTE: path of real data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root`
-        *fEvent.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 4)))->GetString().Atoi();
-        AliInfoF("Run Number = %i", *fEvent.RunNumber);
+        fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 4)))->GetString().Atoi();
+        AliInfoF("Run Number = %i", fOutput.Event.RunNumber);
         auto aux_dir_nr = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 2)))->GetString();
-        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 10));        // = "039.914"
-        *fEvent.DirNumber = TString(aux_dir_nr(0, 3)).Atoi();   // = 39
-        *fEvent.DirNumberB = TString(aux_dir_nr(4, 5)).Atoi();  // = 914
-        AliInfoF("Dir Number = %i", *fEvent.DirNumber);
-        AliInfoF("Dir Number B = %i", *fEvent.DirNumberB);
+        aux_dir_nr = TString(aux_dir_nr(2 + 3 + 6, 10));              // = "039.914"
+        fOutput.Event.DirNumber = TString(aux_dir_nr(0, 3)).Atoi();   // = 39
+        fOutput.Event.DirNumberB = TString(aux_dir_nr(4, 5)).Atoi();  // = 914
+        AliInfoF("Dir Number = %i", fOutput.Event.DirNumber);
+        AliInfoF("Dir Number B = %i", fOutput.Event.DirNumberB);
     }
     delete tokens;  // NOTE: because ROOT
 
-    // Adapt event cuts -- depending on run number //
+    // Adapt event cuts  //
 
+    // For real data, depending on run number
     // Reference: https://twiki.cern.ch/twiki/bin/viewauth/ALICE/AliDPGRunList18r1
-    if (!fIsMC && (*fEvent.RunNumber == 296749 || *fEvent.RunNumber == 296750 || *fEvent.RunNumber == 296849 || *fEvent.RunNumber == 296890 ||
-                   *fEvent.RunNumber == 297029 || *fEvent.RunNumber == 297194 || *fEvent.RunNumber == 297219 || *fEvent.RunNumber == 297481)) {
+    if (!fIsMC && (fOutput.Event.RunNumber == 296749 || fOutput.Event.RunNumber == 296750 || fOutput.Event.RunNumber == 296849 ||
+                   fOutput.Event.RunNumber == 296890 || fOutput.Event.RunNumber == 297029 || fOutput.Event.RunNumber == 297194 ||
+                   fOutput.Event.RunNumber == 297219 || fOutput.Event.RunNumber == 297481)) {
         fEventCuts.UseTimeRangeCut();
         fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kINT7);
     }
@@ -232,7 +211,7 @@ void AliTaskEsd2Vector::UserExec(Option_t *option) {
     // mc particles //
 
     if (fIsMC) {
-        if (fIsSignalMC) ProcessInjectedReactions();
+        if (fIsMC_DedicatedSexaquark) ProcessInjectedReactions();
         ProcessMCParticles();
     }
 
@@ -242,17 +221,13 @@ void AliTaskEsd2Vector::UserExec(Option_t *option) {
 
     // (anti)lambdas //
 
-    ProcessLambdas();
+    ProcessPreFoundLambdas();
 
     // end of event //
 
     fWriter->Fill();
-    if (fIsMC) {
-        if (fIsSignalMC) ClearBranches_Injected();
-        ClearBranches_MC();
-    }
-    ClearBranches_Tracks();
-    ClearBranches_Lambdas();
+    fOutput.Clear(fIsMC, fIsMC_DedicatedSexaquark);
+    if (fIsFirstEvent) fIsFirstEvent = false;
 
     // post data //
 
@@ -263,7 +238,7 @@ void AliTaskEsd2Vector::UserExec(Option_t *option) {
 
 bool AliTaskEsd2Vector::ProcessEvent() {
 
-#if E2V_DEBUG
+#if E2R_VERBOSE
     AliInfoF("fPIDResponse.UseTPCEtaCorrection()          = %i", fPIDResponse->UseTPCEtaCorrection());
     AliInfoF("fPIDResponse.UseTPCMultiplicityCorrection() = %i", fPIDResponse->UseTPCMultiplicityCorrection());
     AliInfoF("fPIDResponse.UseTPCPileupCorrection()       = %i", fPIDResponse->UseTPCPileupCorrection());
@@ -285,62 +260,61 @@ bool AliTaskEsd2Vector::ProcessEvent() {
     // Assign metadata branches (1) //
 
     // NOTE: `RunNumber`, `DirNumber` and `DirNumberB` are set in `UserNotify()`
-    *fEvent.EventNumber = fESD->GetEventNumberInFile();
+    fOutput.Event.EventNumber = fESD->GetEventNumberInFile();
     fPrimaryVertex = fESD->GetPrimaryVertex();
 
     // Apply selection //
 
-    if (!PassesEventSelection()) return false;
+    if (!fIsMC_DedicatedHdibaryon && !PassesEventSelection()) return false;
 
     // Assign more branches (2) //
 
     auto *MultSelection = dynamic_cast<AliMultSelection *>(fESD->FindListObject("MultSelection"));
     if (MultSelection == nullptr) AliFatal("AliMultSelection couldn't be found.");
-    *fEvent.Centrality = MultSelection->GetMultiplicityPercentile("V0M");
-    *fEvent.MagneticField = static_cast<float>(fESD->GetMagneticField());
+    fOutput.Event.Centrality = MultSelection->GetMultiplicityPercentile("V0M");
+    fOutput.Event.MagneticField = static_cast<float>(fESD->GetMagneticField());
 
     // Fill QA hist //
 
-    fHist_Centrality->Fill(*fEvent.Centrality);
-    if ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U) fHist_CentralityINT7->Fill(*fEvent.Centrality);
+    fHist_Centrality->Fill(fOutput.Event.Centrality);
+    if ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U) fHist_CentralityINT7->Fill(fOutput.Event.Centrality);
 
     // Assign rest of branches (3) //
 
-    *fEvent.PV_X = static_cast<float>(fPrimaryVertex->GetX());
-    *fEvent.PV_Y = static_cast<float>(fPrimaryVertex->GetY());
-    *fEvent.PV_Z = static_cast<float>(fPrimaryVertex->GetZ());
+    fOutput.Event.PV_X = static_cast<float>(fPrimaryVertex->GetX());
+    fOutput.Event.PV_Y = static_cast<float>(fPrimaryVertex->GetY());
+    fOutput.Event.PV_Z = static_cast<float>(fPrimaryVertex->GetZ());
 
-    *fEvent.PV_NContributors = fPrimaryVertex->GetNContributors();
-    *fEvent.PV_Dispersion = static_cast<float>(fPrimaryVertex->GetDispersion());
+    fOutput.Event.PV_NContributors = fPrimaryVertex->GetNContributors();
+    fOutput.Event.PV_Dispersion = static_cast<float>(fPrimaryVertex->GetDispersion());
 
-    double PV_CovMatrix[6]{};
+    double PV_CovMatrix[6];  // non-initialized on purpose
     fPrimaryVertex->GetCovarianceMatrix(PV_CovMatrix);
-    for (int i = 0; i < 6; ++i) (*fEvent.PV_CovMatrix)[i] = static_cast<float>(PV_CovMatrix[i]);
+    fOutput.Event.PV_CovMatrix = {static_cast<float>(PV_CovMatrix[0]), static_cast<float>(PV_CovMatrix[1]), static_cast<float>(PV_CovMatrix[2]),
+                                  static_cast<float>(PV_CovMatrix[3]), static_cast<float>(PV_CovMatrix[4]), static_cast<float>(PV_CovMatrix[5])};
 
     const auto *PrimaryVertex_SPD = fESD->GetPrimaryVertexSPD();
-    *fEvent.SPD_PV_Z = static_cast<float>(PrimaryVertex_SPD->GetZ());
+    fOutput.Event.SPD_PV_Z = static_cast<float>(PrimaryVertex_SPD->GetZ());
 
-    double PV_SPD_CovMatrix[6]{};
+    double PV_SPD_CovMatrix[6];  // non-initialized on purpose
     PrimaryVertex_SPD->GetCovarianceMatrix(PV_SPD_CovMatrix);
-    *fEvent.SPD_PV_ZErr = static_cast<float>(PV_SPD_CovMatrix[5]);
+    fOutput.Event.SPD_PV_ZErr = static_cast<float>(PV_SPD_CovMatrix[5]);
 
-    *fEvent.NTracks = fESD->GetNumberOfTracks();
-    *fEvent.NTPCClusters = fESD->GetNumberOfTPCClusters();
-    *fEvent.IsMB = ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U);
-    *fEvent.IsHighMultV0 = ((fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U);
-    *fEvent.IsHighMultSPD = ((fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD) != 0U);
-    *fEvent.IsCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U);
-    *fEvent.IsSemiCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U);
+    fOutput.Event.NTracks = fESD->GetNumberOfTracks();
+    fOutput.Event.NTPCClusters = fESD->GetNumberOfTPCClusters();
+    fOutput.Event.IsMB = ((fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U);
+    fOutput.Event.IsCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U);
+    fOutput.Event.IsSemiCentral = ((fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U);
 
     // Assign MC branches (4) //
 
     if (fIsMC) {
         fMC_PrimaryVertex = fMC->GetPrimaryVertex();
-        *fEvent.MC_PV_X = static_cast<float>(fMC_PrimaryVertex->GetX());
-        *fEvent.MC_PV_Y = static_cast<float>(fMC_PrimaryVertex->GetY());
-        *fEvent.MC_PV_Z = static_cast<float>(fMC_PrimaryVertex->GetZ());
-        *fEvent.MC_IsGenPileup = AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing");
-        *fEvent.MC_IsSBCPileup = AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing");
+        fOutput.MC_Event.PV_X = static_cast<float>(fMC_PrimaryVertex->GetX());
+        fOutput.MC_Event.PV_Y = static_cast<float>(fMC_PrimaryVertex->GetY());
+        fOutput.MC_Event.PV_Z = static_cast<float>(fMC_PrimaryVertex->GetZ());
+        fOutput.MC_Event.IsGenPileup = !fIsMC_DedicatedHdibaryon ? AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing") : false;
+        fOutput.MC_Event.IsSBCPileup = !fIsMC_DedicatedHdibaryon ? AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing") : false;
     }
 
     return true;
@@ -348,8 +322,8 @@ bool AliTaskEsd2Vector::ProcessEvent() {
 
 // Apply event selection.
 bool AliTaskEsd2Vector::PassesEventSelection() {
-
     fHist_Events_Bookkeeping->Fill(0.);
+
     if (!fEventCuts.AcceptEvent(fESD)) return false;
     fHist_Events_Bookkeeping->Fill(1.);
     // Pileup Events //
@@ -359,15 +333,13 @@ bool AliTaskEsd2Vector::PassesEventSelection() {
     if (!fEventCuts.PassedCut(AliEventCuts::kTPCPileUp)) return false;
     fHist_Events_Bookkeeping->Fill(3.);
     // Important for data? //
-    if (!fIsMC && fESD->GetHeader()->GetEventType() != 7) return false;
-    fHist_Events_Bookkeeping->Fill(4.);
+    // if (!fIsMC && fESD->GetHeader()->GetEventType() != 7) return false;
+    // fHist_Events_Bookkeeping->Fill(4.);
     // Trigger Selection //
     bool IsMB = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) != 0U;
-    bool IsHighMultV0 = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultV0) != 0U;
-    bool IsHighMultSPD = (fInputHandler->IsEventSelected() & AliVEvent::kHighMultSPD) != 0U;
     bool IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) != 0U;
     bool IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) != 0U;
-    if (!IsMB && !IsHighMultV0 && !IsHighMultSPD && !IsCentral && !IsSemiCentral) return false;
+    if (!IsMB && !IsCentral && !IsSemiCentral) return false;
     fHist_Events_Bookkeeping->Fill(5.);
     // rec. PV z-vertex range //
     if (std::abs(fPrimaryVertex->GetZ()) > E2R::Cuts::AbsMax_PV_Z) return false;
@@ -376,257 +348,68 @@ bool AliTaskEsd2Vector::PassesEventSelection() {
     return true;
 }
 
-// # Trees # //
-
-// Add branches to `fOutputTree`.
-void AliTaskEsd2Vector::CreateEventsBranches(ROOT::RNTupleModel *model) {
-    fEvent.RunNumber = model->MakeField<unsigned int>("RunNumber");
-    fEvent.DirNumber = model->MakeField<unsigned int>("DirNumber");
-    if (!fIsMC) fEvent.DirNumberB = model->MakeField<unsigned int>("DirNumberB");
-    fEvent.EventNumber = model->MakeField<unsigned int>("EventNumber");
-    fEvent.Centrality = model->MakeField<float>("Centrality");
-    fEvent.MagneticField = model->MakeField<float>("MagneticField");
-    if (fIsMC) {
-        fEvent.MC_PV_X = model->MakeField<float>("MC_PV_X");
-        fEvent.MC_PV_Y = model->MakeField<float>("MC_PV_Y");
-        fEvent.MC_PV_Z = model->MakeField<float>("MC_PV_Z");
-        fEvent.MC_IsGenPileup = model->MakeField<bool>("MC_IsGenPileup");
-        fEvent.MC_IsSBCPileup = model->MakeField<bool>("MC_IsSBCPileup");
-    }
-    fEvent.PV_NContributors = model->MakeField<int>("PV_NContributors");
-    fEvent.PV_Dispersion = model->MakeField<float>("PV_Dispersion");
-    fEvent.PV_X = model->MakeField<float>("PV_X");
-    fEvent.PV_Y = model->MakeField<float>("PV_Y");
-    fEvent.PV_Z = model->MakeField<float>("PV_Z");
-    fEvent.PV_CovMatrix = model->MakeField<std::array<float, 6>>("PV_CovMatrix");
-    fEvent.SPD_PV_Z = model->MakeField<float>("SPD_PV_Z");
-    fEvent.SPD_PV_ZErr = model->MakeField<float>("SPD_PV_ZErr");
-    fEvent.NTracks = model->MakeField<int>("NTracks");
-    fEvent.NTPCClusters = model->MakeField<int>("NTPCClusters");
-    fEvent.IsMB = model->MakeField<bool>("IsMB");
-    fEvent.IsHighMultV0 = model->MakeField<bool>("IsHighMultV0");
-    fEvent.IsHighMultSPD = model->MakeField<bool>("IsHighMultSPD");
-    fEvent.IsCentral = model->MakeField<bool>("IsCentral");
-    fEvent.IsSemiCentral = model->MakeField<bool>("IsSemiCentral");
-}
-
-// Add branches to `fTree_Injected`.
-void AliTaskEsd2Vector::CreateInjectedBranches(ROOT::RNTupleModel *model) {
-    fInjectedSexa.ReactionID = model->MakeField<std::vector<int>>("ReactionID");
-    fInjectedSexa.Px = model->MakeField<std::vector<float>>("Sexa_Px");
-    fInjectedSexa.Py = model->MakeField<std::vector<float>>("Sexa_Py");
-    fInjectedSexa.Pz = model->MakeField<std::vector<float>>("Sexa_Pz");
-    fInjectedSexa.Nucleon_Px = model->MakeField<std::vector<float>>("Nucleon_Px");
-    fInjectedSexa.Nucleon_Py = model->MakeField<std::vector<float>>("Nucleon_Py");
-    fInjectedSexa.Nucleon_Pz = model->MakeField<std::vector<float>>("Nucleon_Pz");
-}
-
-// Add branches to the MC tree.
-void AliTaskEsd2Vector::CreateMCBranches(ROOT::RNTupleModel *model) {
-    fMcParticle.PdgCode = model->MakeField<std::vector<int>>("MC_PdgCode");
-    fMcParticle.Charge = model->MakeField<std::vector<char>>("MC_Charge");
-    fMcParticle.Mother_McEntry = model->MakeField<std::vector<int>>("MC_Mother_McEntry");
-    fMcParticle.N_Daughters = model->MakeField<std::vector<unsigned int>>("MC_N_Daughters");
-    fMcParticle.FirstDau_McEntry = model->MakeField<std::vector<int>>("MC_FirstDau_McEntry");
-    fMcParticle.LastDau_McEntry = model->MakeField<std::vector<int>>("MC_LastDau_McEntry");
-    fMcParticle.Origin_X = model->MakeField<std::vector<float>>("MC_Origin_X");
-    fMcParticle.Origin_Y = model->MakeField<std::vector<float>>("MC_Origin_Y");
-    fMcParticle.Origin_Z = model->MakeField<std::vector<float>>("MC_Origin_Z");
-    fMcParticle.Px = model->MakeField<std::vector<float>>("MC_Px");
-    fMcParticle.Py = model->MakeField<std::vector<float>>("MC_Py");
-    fMcParticle.Pz = model->MakeField<std::vector<float>>("MC_Pz");
-    fMcParticle.E = model->MakeField<std::vector<float>>("MC_E");
-    fMcParticle.Status = model->MakeField<std::vector<unsigned int>>("MC_Status");
-    fMcParticle.Generator = model->MakeField<std::vector<char>>("MC_Generator");
-    fMcParticle.IsPhysPrimary = model->MakeField<std::vector<char>>("MC_IsPhysPrimary");
-    fMcParticle.IsSecFromMat = model->MakeField<std::vector<char>>("MC_IsSecFromMat");
-    fMcParticle.IsSecFromWeak = model->MakeField<std::vector<char>>("MC_IsSecFromWeak");
-#if E2V_MC_EXTRA
-    fMcParticle.IsOOBPileup = model->MakeField<std::vector<char>>("MC_IsOOBPileup");
-#endif
-}
-
-// Add branches to the tracks tree.
-void AliTaskEsd2Vector::CreateTracksBranches(ROOT::RNTupleModel *model) {
-    fTrack.EsdEntry = model->MakeField<std::vector<unsigned int>>("Track_EsdEntry");
-    fTrack.X = model->MakeField<std::vector<float>>("Track_X");
-    fTrack.Y = model->MakeField<std::vector<float>>("Track_Y");
-    fTrack.Z = model->MakeField<std::vector<float>>("Track_Z");
-    fTrack.Px = model->MakeField<std::vector<float>>("Track_Px");
-    fTrack.Py = model->MakeField<std::vector<float>>("Track_Py");
-    fTrack.Pz = model->MakeField<std::vector<float>>("Track_Pz");
-    fTrack.Charge = model->MakeField<std::vector<char>>("Track_Charge");
-    fTrack.PreDCAxy = model->MakeField<std::vector<float>>("Track_PreDCAxy");
-    fTrack.PreDCAz = model->MakeField<std::vector<float>>("Track_PreDCAz");
-    fTrack.TPC_Signal = model->MakeField<std::vector<float>>("Track_TPC_Signal");
-    fTrack.ITS_FirstLayer = model->MakeField<std::vector<int>>("Track_ITS_FirstLayer");
-    fTrack.NSigmaPion = model->MakeField<std::vector<float>>("Track_NSigmaPion");
-    fTrack.NSigmaKaon = model->MakeField<std::vector<float>>("Track_NSigmaKaon");
-    fTrack.NSigmaProton = model->MakeField<std::vector<float>>("Track_NSigmaProton");
-    fTrack.CovMatrix = model->MakeField<std::vector<std::array<float, 21>>>("Track_CovMatrix");
-#if E2V_TPC_EXTRA
-    fTrack.TPC_DCAxy = model->MakeField<std::vector<float>>("Track_TPC_DCAxy");
-    fTrack.TPC_DCAz = model->MakeField<std::vector<float>>("Track_TPC_DCAz");
-    fTrack.TPC_NCrossedRows = model->MakeField<std::vector<float>>("Track_TPC_NCrossedRows");
-    fTrack.TPC_NClusters = model->MakeField<std::vector<unsigned int>>("Track_TPC_NClusters");
-    fTrack.TPC_NClustersLC = model->MakeField<std::vector<unsigned int>>("Track_TPC_NClustersLC");
-    fTrack.TPC_NClustersFound = model->MakeField<std::vector<unsigned int>>("Track_TPC_NClustersFound");
-    fTrack.TPC_NClustersShared = model->MakeField<std::vector<unsigned int>>("Track_TPC_NClustersShared");
-    fTrack.TPC_Chi2 = model->MakeField<std::vector<float>>("Track_TPC_Chi2");
-    fTrack.TPC_Chi2Constrained = model->MakeField<std::vector<float>>("Track_TPC_Chi2Constrained");
-    fTrack.TPC_Chi2TCVG = model->MakeField<std::vector<float>>("Track_TPC_Chi2TCVG");
-    if (fIsMC) fTrack.TPC_SignalTunedOnData = model->MakeField<std::vector<float>>("Track_TPC_SignalTunedOnData");
-    fTrack.TPC_SignalSigma = model->MakeField<std::vector<float>>("Track_TPC_SignalSigma");
-    fTrack.TPC_SignalCorrected = model->MakeField<std::vector<float>>("Track_TPC_SignalCorrected");
-    fTrack.TPC_ESignalPion = model->MakeField<std::vector<float>>("Track_TPC_ESignalPion");
-    fTrack.TPC_ESigmaPion = model->MakeField<std::vector<float>>("Track_TPC_ESigmaPion");
-    fTrack.TPC_ESignalKaon = model->MakeField<std::vector<float>>("Track_TPC_ESignalKaon");
-    fTrack.TPC_ESigmaKaon = model->MakeField<std::vector<float>>("Track_TPC_ESigmaKaon");
-    fTrack.TPC_ESignalProton = model->MakeField<std::vector<float>>("Track_TPC_ESignalProton");
-    fTrack.TPC_ESigmaProton = model->MakeField<std::vector<float>>("Track_TPC_ESigmaProton");
-    fTrack.TPC_SignalN = model->MakeField<std::vector<unsigned int>>("Track_TPC_SignalN");
-    fTrack.TPC_PointsFirst = model->MakeField<std::vector<float>>("Track_TPC_PointsFirst");
-    fTrack.TPC_PointsIndexMax = model->MakeField<std::vector<float>>("Track_TPC_PointsIndexMax");
-    fTrack.TPC_PointsLast = model->MakeField<std::vector<float>>("Track_TPC_PointsLast");
-    fTrack.TPC_PointsMaxDens = model->MakeField<std::vector<float>>("Track_TPC_PointsMaxDens");
-    fTrack.TPC_FirstRow = model->MakeField<std::vector<int>>("Track_TPC_FirstRow");
-#endif
-    if (fIsMC) fTrack.McEntry = model->MakeField<std::vector<int>>("Track_McEntry");
-}
-
-void AliTaskEsd2Vector::CreateLambdasBranches(ROOT::RNTupleModel *model) {
-    fLambda.EsdEntry = model->MakeField<std::vector<unsigned int>>("Lambda_EsdEntry");
-    fLambda.Decay_X = model->MakeField<std::vector<float>>("Lambda_Decay_X");
-    fLambda.Decay_Y = model->MakeField<std::vector<float>>("Lambda_Decay_Y");
-    fLambda.Decay_Z = model->MakeField<std::vector<float>>("Lambda_Decay_Z");
-    fLambda.Px = model->MakeField<std::vector<float>>("Lambda_Px");
-    fLambda.Py = model->MakeField<std::vector<float>>("Lambda_Py");
-    fLambda.Pz = model->MakeField<std::vector<float>>("Lambda_Pz");
-    fLambda.DcaV0Daughters = model->MakeField<std::vector<float>>("Lambda_DcaV0Daughters");
-    // -- negative daughter (anti-proton for anti-lambda, pi-minus for lambda)
-    fLambda.Neg_EsdEntry = model->MakeField<std::vector<unsigned int>>("Lambda_Neg_EsdEntry");
-    fLambda.Neg_PCAwrtV0_Px = model->MakeField<std::vector<float>>("Lambda_Neg_PCAwrtV0_Px");
-    fLambda.Neg_PCAwrtV0_Py = model->MakeField<std::vector<float>>("Lambda_Neg_PCAwrtV0_Py");
-    fLambda.Neg_PCAwrtV0_Pz = model->MakeField<std::vector<float>>("Lambda_Neg_PCAwrtV0_Pz");
-    fLambda.Neg_PreDCAxy = model->MakeField<std::vector<float>>("Lambda_Neg_PreDCAxy");
-    fLambda.Neg_PreDCAz = model->MakeField<std::vector<float>>("Lambda_Neg_PreDCAz");
-    fLambda.Neg_NSigmaProton = model->MakeField<std::vector<float>>("Lambda_Neg_NSigmaProton");
-    fLambda.Neg_NSigmaKaon = model->MakeField<std::vector<float>>("Lambda_Neg_NSigmaKaon");
-    fLambda.Neg_NSigmaPion = model->MakeField<std::vector<float>>("Lambda_Neg_NSigmaPion");
-    // -- positive daughter (proton for lambda, pi-plus for anti-lambda)
-    fLambda.Pos_EsdEntry = model->MakeField<std::vector<unsigned int>>("Lambda_Pos_EsdEntry");
-    fLambda.Pos_PCAwrtV0_Px = model->MakeField<std::vector<float>>("Lambda_Pos_PCAwrtV0_Px");
-    fLambda.Pos_PCAwrtV0_Py = model->MakeField<std::vector<float>>("Lambda_Pos_PCAwrtV0_Py");
-    fLambda.Pos_PCAwrtV0_Pz = model->MakeField<std::vector<float>>("Lambda_Pos_PCAwrtV0_Pz");
-    fLambda.Pos_PreDCAxy = model->MakeField<std::vector<float>>("Lambda_Pos_PreDCAxy");
-    fLambda.Pos_PreDCAz = model->MakeField<std::vector<float>>("Lambda_Pos_PreDCAz");
-    fLambda.Pos_NSigmaProton = model->MakeField<std::vector<float>>("Lambda_Pos_NSigmaProton");
-    fLambda.Pos_NSigmaKaon = model->MakeField<std::vector<float>>("Lambda_Pos_NSigmaKaon");
-    fLambda.Pos_NSigmaPion = model->MakeField<std::vector<float>>("Lambda_Pos_NSigmaPion");
-    if (fIsMC) {
-        fLambda.Neg_McEntry = model->MakeField<std::vector<int>>("Lambda_Neg_McEntry");
-        fLambda.Pos_McEntry = model->MakeField<std::vector<int>>("Lambda_Pos_McEntry");
-    }
-}
-
 // # MC Generated # //
 
 // Loop over MC particles in a single event.
 void AliTaskEsd2Vector::ProcessMCParticles() {
+
+    // vector preallocation //
     const int n_mc = fMC->GetNumberOfTracks();
-    ReserveBranches_MC(static_cast<std::size_t>(n_mc));
+    if (fIsFirstEvent) fOutput.McParticle.reserve(n_mc);
+
     // read mc particles //
     for (int mc_entry = 0; mc_entry < n_mc; ++mc_entry) {
         auto *mcPart = dynamic_cast<AliMCParticle *>(fMC->GetTrack(mc_entry));
         if (mcPart == nullptr) continue;
-        // -- fill branches
-        fMcParticle.PdgCode->emplace_back(mcPart->PdgCode());
-        fMcParticle.Charge->emplace_back(static_cast<int>(mcPart->Charge() / 3));
-        fMcParticle.Mother_McEntry->emplace_back(mcPart->GetMother());
-        fMcParticle.N_Daughters->emplace_back(static_cast<unsigned int>(mcPart->GetNDaughters()));
-        fMcParticle.FirstDau_McEntry->emplace_back(mcPart->GetDaughterFirst());
-        fMcParticle.LastDau_McEntry->emplace_back(mcPart->GetDaughterLast());
-        fMcParticle.Origin_X->emplace_back(static_cast<float>(mcPart->Xv()));
-        fMcParticle.Origin_Y->emplace_back(static_cast<float>(mcPart->Yv()));
-        fMcParticle.Origin_Z->emplace_back(static_cast<float>(mcPart->Zv()));
-        fMcParticle.Px->emplace_back(static_cast<float>(mcPart->Px()));
-        fMcParticle.Py->emplace_back(static_cast<float>(mcPart->Py()));
-        fMcParticle.Pz->emplace_back(static_cast<float>(mcPart->Pz()));
-        fMcParticle.E->emplace_back(static_cast<float>(mcPart->E()));
-        fMcParticle.Status->emplace_back(mcPart->MCStatusCode());
-        fMcParticle.Generator->emplace_back(static_cast<char>(mcPart->GetGeneratorIndex()));
-        fMcParticle.IsPhysPrimary->emplace_back(static_cast<char>(mcPart->IsPhysicalPrimary()));
-        fMcParticle.IsSecFromMat->emplace_back(static_cast<char>(mcPart->IsSecondaryFromMaterial()));
-        fMcParticle.IsSecFromWeak->emplace_back(static_cast<char>(mcPart->IsSecondaryFromWeakDecay()));
-#if E2V_DEBUG
+
+        // create new mc //
+        POD::McParticle new_mc;
+        new_mc.PdgCode = mcPart->PdgCode();
+        new_mc.Charge = static_cast<int>(mcPart->Charge() / 3);  // because `TParticle` returns charge in |e|/3
+        new_mc.Mother_McEntry = mcPart->GetMother();
+        new_mc.N_Daughters = static_cast<unsigned int>(mcPart->GetNDaughters());
+        new_mc.FirstDau_McEntry = mcPart->GetDaughterFirst();
+        new_mc.LastDau_McEntry = mcPart->GetDaughterLast();
+        new_mc.Origin_X = static_cast<float>(mcPart->Xv());
+        new_mc.Origin_Y = static_cast<float>(mcPart->Yv());
+        new_mc.Origin_Z = static_cast<float>(mcPart->Zv());
+        new_mc.Px = static_cast<float>(mcPart->Px());
+        new_mc.Py = static_cast<float>(mcPart->Py());
+        new_mc.Pz = static_cast<float>(mcPart->Pz());
+        new_mc.Energy = static_cast<float>(mcPart->E());
+        new_mc.StatusCode = mcPart->MCStatusCode();  // in `AliMCParticle::MCStatusCode()` returns `unsigned int`
+        new_mc.Generator = static_cast<std::uint8_t>(mcPart->GetGeneratorIndex());
+        new_mc.IsPhysPrimary = mcPart->IsPhysicalPrimary();
+        new_mc.IsSecFromMat = mcPart->IsSecondaryFromMaterial();
+        new_mc.IsSecFromWeak = mcPart->IsSecondaryFromWeakDecay();
+#if E2R_VERBOSE
         if (mcPart->GetGeneratorIndex() == 2) {
             AliInfoF("mc_entry=%i,mc_pdg=%i,mc_is_physprim=%i,mc_status=%i,mother_entry=%i",  //
                      mc_entry, mcPart->PdgCode(), mcPart->IsPhysicalPrimary(), mcPart->MCStatusCode(), mcPart->GetMother());
         }
 #endif
-#if E2V_MC_EXTRA
-        fMcParticle.IsOOBPileup->emplace_back(static_cast<char>(AliAnalysisUtils::IsParticleFromOutOfBunchPileupCollision(mc_entry, fMC)));
+#if E2R_MC_EXTRA
+        new_mc.IsOOBPileup = AliAnalysisUtils::IsParticleFromOutOfBunchPileupCollision(mc_entry, fMC);
 #endif
+
+        // push //
+        fOutput.McParticle.emplace_back(new_mc);
     }  // end of loop over MC particles
-}
-
-// Reserve MC particle's vectors' memory allocation.
-void AliTaskEsd2Vector::ReserveBranches_MC(std::size_t size) {
-    fMcParticle.PdgCode->reserve(size);
-    fMcParticle.Charge->reserve(size);
-    fMcParticle.Mother_McEntry->reserve(size);
-    fMcParticle.N_Daughters->reserve(size);
-    fMcParticle.FirstDau_McEntry->reserve(size);
-    fMcParticle.LastDau_McEntry->reserve(size);
-    fMcParticle.Origin_X->reserve(size);
-    fMcParticle.Origin_Y->reserve(size);
-    fMcParticle.Origin_Z->reserve(size);
-    fMcParticle.Px->reserve(size);
-    fMcParticle.Py->reserve(size);
-    fMcParticle.Pz->reserve(size);
-    fMcParticle.E->reserve(size);
-    fMcParticle.Status->reserve(size);
-    fMcParticle.Generator->reserve(size);
-    fMcParticle.IsPhysPrimary->reserve(size);
-    fMcParticle.IsSecFromMat->reserve(size);
-    fMcParticle.IsSecFromWeak->reserve(size);
-#if E2V_MC_EXTRA
-    fMcParticle.IsOOBPileup->reserve(size);
-#endif
-}
-
-// Clear MC branches.
-void AliTaskEsd2Vector::ClearBranches_MC() {
-    fMcParticle.PdgCode->clear();
-    fMcParticle.Charge->clear();
-    fMcParticle.Mother_McEntry->clear();
-    fMcParticle.N_Daughters->clear();
-    fMcParticle.FirstDau_McEntry->clear();
-    fMcParticle.LastDau_McEntry->clear();
-    fMcParticle.Origin_X->clear();
-    fMcParticle.Origin_Y->clear();
-    fMcParticle.Origin_Z->clear();
-    fMcParticle.Px->clear();
-    fMcParticle.Py->clear();
-    fMcParticle.Pz->clear();
-    fMcParticle.E->clear();
-    fMcParticle.Status->clear();
-    fMcParticle.Generator->clear();
-    fMcParticle.IsPhysPrimary->clear();
-    fMcParticle.IsSecFromMat->clear();
-    fMcParticle.IsSecFromWeak->clear();
-#if E2V_MC_EXTRA
-    fMcParticle.IsOOBPileup->clear();
-#endif
 }
 
 // # Reconstructed # //
 
 // Loop over the reconstructed tracks in a single event.
 void AliTaskEsd2Vector::ProcessTracks() {
+
+    // vector preallocation //
     const int n_tracks = fESD->GetNumberOfTracks();
-    ReserveBranches_Tracks(static_cast<std::size_t>(n_tracks));
-    std::array<float, Common::NCovMatrixComponents> cov_arr{};  // auxiliary
+    if (fIsFirstEvent) {
+        fOutput.Track.reserve(n_tracks);
+        if (fIsMC) fOutput.Track_McEntry.reserve(n_tracks);
+    }
+
+    // read tracks //
     for (int esd_entry = 0; esd_entry < n_tracks; ++esd_entry) {
         // get track //
         auto *track = fESD->GetTrack(esd_entry);
@@ -635,27 +418,28 @@ void AliTaskEsd2Vector::ProcessTracks() {
         // get info //
         const auto *inner_param = track->GetInnerParam();  // NOTE: already protected in `PassesTrackSelection`
         if (inner_param == nullptr) continue;
-        double position[3]{};
+        double position[3];  // non-initialized on purpose
         inner_param->GetXYZ(position);
-        double momentum[3]{};
+        double momentum[3];  // non-initialized on purpose
         inner_param->GetPxPyPz(momentum);
-        float dca[2]{};
-        float dca_cov[3]{};
+        float dca[2], dca_cov[3];  // non-initialized on purpose
         track->GetImpactParameters(dca, dca_cov);
-        double cov_xyz_pxpypz[Common::NCovMatrixComponents]{};
+        double cov_xyz_pxpypz[Common::NCovMatrixComponents_State6];  // non-initialized on purpose
         track->GetCovarianceXYZPxPyPz(cov_xyz_pxpypz);
-        // fill branches //
-        fTrack.EsdEntry->emplace_back(static_cast<unsigned int>(esd_entry));
-        fTrack.X->emplace_back(static_cast<float>(position[0]));
-        fTrack.Y->emplace_back(static_cast<float>(position[1]));
-        fTrack.Z->emplace_back(static_cast<float>(position[2]));
-        fTrack.Px->emplace_back(static_cast<float>(momentum[0]));
-        fTrack.Py->emplace_back(static_cast<float>(momentum[1]));
-        fTrack.Pz->emplace_back(static_cast<float>(momentum[2]));
-        fTrack.Charge->emplace_back(inner_param->Charge());
+
+        // create new //
+        POD::Track new_track;  // non-initialized on purpose
+        new_track.EsdEntry = static_cast<unsigned int>(esd_entry);
+        new_track.X = static_cast<float>(position[0]);
+        new_track.Y = static_cast<float>(position[1]);
+        new_track.Z = static_cast<float>(position[2]);
+        new_track.Px = static_cast<float>(momentum[0]);
+        new_track.Py = static_cast<float>(momentum[1]);
+        new_track.Pz = static_cast<float>(momentum[2]);
+        new_track.Charge = inner_param->Charge();
         // -- dca //
-        fTrack.PreDCAxy->emplace_back(dca[0]);
-        fTrack.PreDCAz->emplace_back(dca[1]);
+        new_track.PreDCAxy = dca[0];
+        new_track.PreDCAz = dca[1];
         // -- pid //
         auto bethe_pion = static_cast<double>(fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, track, AliPID::kPion));
         auto e_sigma_pion = static_cast<double>(fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, track, AliPID::kPion));
@@ -666,7 +450,7 @@ void AliTaskEsd2Vector::ProcessTracks() {
         auto n_sigmas_proton =
             static_cast<double>(fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, track, AliPID::kProton));  // NOTE: includes corrections
         double tpc_signal;
-#if !E2V_TPC_EXTRA
+#if !E2R_TPC_EXTRA
         if (fIsMC) {
             tpc_signal = track->GetTPCsignalTunedOnData();
         } else {
@@ -675,58 +459,60 @@ void AliTaskEsd2Vector::ProcessTracks() {
 #else
         tpc_signal = track->GetTPCsignal();  // NOTE: uncorrected, store `Corrected` and `TunedOnData` in other branches
 #endif
-        fTrack.TPC_Signal->emplace_back(static_cast<float>(tpc_signal));
-        fTrack.ITS_FirstLayer->emplace_back(GetFirstLayerFromITS(track));
-        fTrack.NSigmaPion->emplace_back(static_cast<float>(n_sigmas_pion));
-        fTrack.NSigmaKaon->emplace_back(static_cast<float>(n_sigmas_kaon));
-        fTrack.NSigmaProton->emplace_back(static_cast<float>(n_sigmas_proton));
+        new_track.TPC_Signal = static_cast<float>(tpc_signal);
+        new_track.ITS_FirstLayer = GetFirstLayerFromITS(track);
+        new_track.NSigmaPion = static_cast<float>(n_sigmas_pion);
+        new_track.NSigmaKaon = static_cast<float>(n_sigmas_kaon);
+        new_track.NSigmaProton = static_cast<float>(n_sigmas_proton);
         // -- cov. matrix //
-        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents; ++idx_cov) {
-            cov_arr[idx_cov] = static_cast<float>(cov_xyz_pxpypz[idx_cov]);
+        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
+            new_track.CovMatrix[idx_cov] = static_cast<float>(cov_xyz_pxpypz[idx_cov]);
         }
-        fTrack.CovMatrix->emplace_back(cov_arr);
-#if E2V_TPC_EXTRA
+#if E2R_TPC_EXTRA
         // -- get tpc dca
-        float tpc_dca_xy{};
-        float tpc_dca_z{};
+        float tpc_dca_xy, tpc_dca_z;
         track->GetImpactParametersTPC(tpc_dca_xy, tpc_dca_z);
         // -- fill tpc branches (1)
-        fTrack.TPC_DCAxy->emplace_back(tpc_dca_xy);
-        fTrack.TPC_DCAz->emplace_back(tpc_dca_z);
-        fTrack.TPC_NCrossedRows->emplace_back(track->GetTPCCrossedRows());
-        fTrack.TPC_NClusters->emplace_back(static_cast<unsigned int>(track->GetTPCNcls()));
-        fTrack.TPC_NClustersLC->emplace_back(static_cast<unsigned int>(track->GetTPCncls()));
-        fTrack.TPC_NClustersFound->emplace_back(static_cast<unsigned int>(track->GetTPCNclsF()));
-        fTrack.TPC_NClustersShared->emplace_back(static_cast<unsigned int>(track->GetTPCnclsS()));
-        fTrack.TPC_Chi2->emplace_back(static_cast<float>(track->GetTPCchi2()));
-        fTrack.TPC_Chi2Constrained->emplace_back(static_cast<float>(track->GetConstrainedChi2TPC()));
-        fTrack.TPC_Chi2TCVG->emplace_back(static_cast<float>(track->GetChi2TPCConstrainedVsGlobal(fPrimaryVertex)));
-        if (fIsMC) fTrack.TPC_SignalTunedOnData->emplace_back(static_cast<float>(track->GetTPCsignalTunedOnData()));
-        fTrack.TPC_SignalSigma->emplace_back(static_cast<float>(track->GetTPCsignalSigma()));
+        new_track.TPC_DCAxy = tpc_dca_xy;
+        new_track.TPC_DCAz = tpc_dca_z;
+        new_track.TPC_NCrossedRows = track->GetTPCCrossedRows();
+        new_track.TPC_NClusters = static_cast<unsigned int>(track->GetTPCNcls());
+        new_track.TPC_NClustersLC = static_cast<unsigned int>(track->GetTPCncls());
+        new_track.TPC_NClustersFound = static_cast<unsigned int>(track->GetTPCNclsF());
+        new_track.TPC_NClustersShared = static_cast<unsigned int>(track->GetTPCnclsS());
+        new_track.TPC_Chi2 = static_cast<float>(track->GetTPCchi2());
+        new_track.TPC_Chi2Constrained = static_cast<float>(track->GetConstrainedChi2TPC());
+        new_track.TPC_Chi2TCVG = static_cast<float>(track->GetChi2TPCConstrainedVsGlobal(fPrimaryVertex));
+        if (fIsMC) new_track.TPC_SignalTunedOnData = static_cast<float>(track->GetTPCsignalTunedOnData());
+        new_track.TPC_SignalSigma = static_cast<float>(track->GetTPCsignalSigma());
         // -- get tpc pid info
         auto bethe_kaon = static_cast<double>(fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, track, AliPID::kKaon));
         auto e_sigma_kaon = static_cast<double>(fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, track, AliPID::kKaon));
         auto bethe_proton = static_cast<double>(fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, track, AliPID::kProton));
         auto e_sigma_proton = static_cast<double>(fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, track, AliPID::kProton));
         //    -- pion
-        fTrack.TPC_SignalCorrected->emplace_back(static_cast<float>(e_sigma_pion * n_sigmas_pion + bethe_pion));
-        fTrack.TPC_ESignalPion->emplace_back(static_cast<float>(bethe_pion));
-        fTrack.TPC_ESigmaPion->emplace_back(static_cast<float>(e_sigma_pion));
+        new_track.TPC_SignalCorrected = static_cast<float>(e_sigma_pion * n_sigmas_pion + bethe_pion);
+        new_track.TPC_ESignalPion = static_cast<float>(bethe_pion);
+        new_track.TPC_ESigmaPion = static_cast<float>(e_sigma_pion);
         //    -- kaon
-        fTrack.TPC_ESignalKaon->emplace_back(static_cast<float>(bethe_kaon));
-        fTrack.TPC_ESigmaKaon->emplace_back(static_cast<float>(e_sigma_kaon));
+        new_track.TPC_ESignalKaon = static_cast<float>(bethe_kaon);
+        new_track.TPC_ESigmaKaon = static_cast<float>(e_sigma_kaon);
         //    -- proton
-        fTrack.TPC_ESignalProton->emplace_back(static_cast<float>(bethe_proton));
-        fTrack.TPC_ESigmaProton->emplace_back(static_cast<float>(e_sigma_proton));
+        new_track.TPC_ESignalProton = static_cast<float>(bethe_proton);
+        new_track.TPC_ESigmaProton = static_cast<float>(e_sigma_proton);
         // -- fill tpc branches (2)
-        fTrack.TPC_SignalN->emplace_back(static_cast<unsigned int>(track->GetTPCsignalN()));
-        fTrack.TPC_PointsFirst->emplace_back(static_cast<float>(track->GetTPCPoints(0)));
-        fTrack.TPC_PointsIndexMax->emplace_back(static_cast<float>(track->GetTPCPoints(1)));
-        fTrack.TPC_PointsLast->emplace_back(static_cast<float>(track->GetTPCPoints(2)));
-        fTrack.TPC_PointsMaxDens->emplace_back(static_cast<float>(track->GetTPCPoints(3)));
-        fTrack.TPC_FirstRow->emplace_back(GetFirstRowFromTPCClusterMap(track));
+        new_track.TPC_SignalN = static_cast<unsigned int>(track->GetTPCsignalN());
+        new_track.TPC_PointsFirst = static_cast<float>(track->GetTPCPoints(0));
+        new_track.TPC_PointsIndexMax = static_cast<float>(track->GetTPCPoints(1));
+        new_track.TPC_PointsLast = static_cast<float>(track->GetTPCPoints(2));
+        new_track.TPC_PointsMaxDens = static_cast<float>(track->GetTPCPoints(3));
+        new_track.TPC_FirstRow = GetFirstRowFromTPCClusterMap(track);
 #endif
-        if (fIsMC) fTrack.McEntry->emplace_back(std::abs(track->GetLabel()));
+
+        // push reconstructed //
+        fOutput.Track.emplace_back(new_track);
+        // push mc info //
+        if (fIsMC) fOutput.Track_McEntry.emplace_back(std::abs(track->GetLabel()));
     }  // end of loop over tracks
 }
 
@@ -812,121 +598,85 @@ bool AliTaskEsd2Vector::PassesTrackSelection(const AliESDtrack *track) {
     return true;
 }
 
-// Reserve tracks-related vectors' memory allocation.
-void AliTaskEsd2Vector::ReserveBranches_Tracks(std::size_t size) {
-    fTrack.EsdEntry->reserve(size);
-    fTrack.X->reserve(size);
-    fTrack.Y->reserve(size);
-    fTrack.Z->reserve(size);
-    fTrack.Px->reserve(size);
-    fTrack.Py->reserve(size);
-    fTrack.Pz->reserve(size);
-    fTrack.Charge->reserve(size);
-    fTrack.PreDCAxy->reserve(size);
-    fTrack.PreDCAz->reserve(size);
-    fTrack.TPC_Signal->reserve(size);
-    fTrack.NSigmaPion->reserve(size);
-    fTrack.NSigmaKaon->reserve(size);
-    fTrack.NSigmaProton->reserve(size);
-    fTrack.CovMatrix->reserve(size);
-#if E2V_TPC_EXTRA
-    fTrack.TPC_DCAxy->reserve(size);
-    fTrack.TPC_DCAz->reserve(size);
-    fTrack.TPC_NCrossedRows->reserve(size);
-    fTrack.TPC_NClusters->reserve(size);
-    fTrack.TPC_NClustersLC->reserve(size);
-    fTrack.TPC_NClustersFound->reserve(size);
-    fTrack.TPC_NClustersShared->reserve(size);
-    fTrack.TPC_Chi2->reserve(size);
-    fTrack.TPC_Chi2Constrained->reserve(size);
-    fTrack.TPC_Chi2TCVG->reserve(size);
-    if (fIsMC) fTrack.TPC_SignalTunedOnData->reserve(size);
-    fTrack.TPC_SignalSigma->reserve(size);
-    fTrack.TPC_SignalCorrected->reserve(size);
-    fTrack.TPC_ESignalPion->reserve(size);
-    fTrack.TPC_ESigmaPion->reserve(size);
-    fTrack.TPC_ESignalKaon->reserve(size);
-    fTrack.TPC_ESigmaKaon->reserve(size);
-    fTrack.TPC_ESignalProton->reserve(size);
-    fTrack.TPC_ESigmaProton->reserve(size);
-    fTrack.TPC_SignalN->reserve(size);
-    fTrack.TPC_PointsFirst->reserve(size);
-    fTrack.TPC_PointsIndexMax->reserve(size);
-    fTrack.TPC_PointsLast->reserve(size);
-    fTrack.TPC_PointsMaxDens->reserve(size);
-    fTrack.TPC_FirstRow->reserve(size);
-#endif
-    if (fIsMC) fTrack.McEntry->reserve(size);
-}
-
-// Clear the branches of the reconstructed tracks.
-void AliTaskEsd2Vector::ClearBranches_Tracks() {
-    fTrack.EsdEntry->clear();
-    fTrack.X->clear();
-    fTrack.Y->clear();
-    fTrack.Z->clear();
-    fTrack.Px->clear();
-    fTrack.Py->clear();
-    fTrack.Pz->clear();
-    fTrack.Charge->clear();
-    fTrack.PreDCAxy->clear();
-    fTrack.PreDCAz->clear();
-    fTrack.TPC_Signal->clear();
-    fTrack.NSigmaPion->clear();
-    fTrack.NSigmaKaon->clear();
-    fTrack.NSigmaProton->clear();
-    fTrack.CovMatrix->clear();
-#if E2V_TPC_EXTRA
-    fTrack.TPC_DCAxy->clear();
-    fTrack.TPC_DCAz->clear();
-    fTrack.TPC_NCrossedRows->clear();
-    fTrack.TPC_NClusters->clear();
-    fTrack.TPC_NClustersLC->clear();
-    fTrack.TPC_NClustersFound->clear();
-    fTrack.TPC_NClustersShared->clear();
-    fTrack.TPC_Chi2->clear();
-    fTrack.TPC_Chi2Constrained->clear();
-    fTrack.TPC_Chi2TCVG->clear();
-    if (fIsMC) fTrack.TPC_SignalTunedOnData->clear();
-    fTrack.TPC_SignalSigma->clear();
-    fTrack.TPC_SignalCorrected->clear();
-    fTrack.TPC_ESignalPion->clear();
-    fTrack.TPC_ESigmaPion->clear();
-    fTrack.TPC_ESignalKaon->clear();
-    fTrack.TPC_ESigmaKaon->clear();
-    fTrack.TPC_ESignalProton->clear();
-    fTrack.TPC_ESigmaProton->clear();
-    fTrack.TPC_SignalN->clear();
-    fTrack.TPC_PointsFirst->clear();
-    fTrack.TPC_PointsIndexMax->clear();
-    fTrack.TPC_PointsLast->clear();
-    fTrack.TPC_PointsMaxDens->clear();
-    fTrack.TPC_FirstRow->clear();
-#endif
-    if (fIsMC) fTrack.McEntry->clear();
-}
-
 // # Lambdas # //
 
-void AliTaskEsd2Vector::ProcessLambdas() {
+void AliTaskEsd2Vector::ProcessPreFoundLambdas() {
+
+    // vector preallocation //
     const int n_v0s = fESD->GetNumberOfV0s();
-    for (int v0_entry = 0; v0_entry < n_v0s; ++v0_entry) {
-        auto *v0 = fESD->GetV0(v0_entry);
+    if (fIsFirstEvent) {
+        fOutput.PreFoundLambda.reserve(n_v0s);
+        if (fIsMC) {
+            fOutput.PreFoundLambda_Neg_McEntry.reserve(n_v0s);
+            fOutput.PreFoundLambda_Pos_McEntry.reserve(n_v0s);
+        }
+    }
+
+    // loop over pre-found v0s //
+    for (int entry_v0 = 0; entry_v0 < n_v0s; ++entry_v0) {
+        auto *v0 = fESD->GetV0(entry_v0);
         if (v0 == nullptr) continue;
 
-        // get pid //
-        // -- negative daughter
+        // apply cuts (1) -- choose only on-the-fly v0s //
+
+        if (!v0->GetOnFlyStatus()) continue;
+
+        // get daughters' info //
+
+        // negative daughter
+        // -- state + cov. matrix
+        const auto *neg_param = v0->GetParamN();
+        double neg_position[3];  // non-initialized on purpose
+        neg_param->GetXYZ(neg_position);
+        double neg_momentum[3];  // non-initialized on purpose
+        neg_param->GetPxPyPz(neg_momentum);
+        double neg_cov_xyz_pxpypz[Common::NCovMatrixComponents_State6];  // non-initialized on purpose
+        neg_param->GetCovarianceXYZPxPyPz(neg_cov_xyz_pxpypz);
+        // -- dca w.r.t. pv
+        float neg_dca[2], neg_cov_dca[3];  // non-initialized on purpose
+        neg_param->GetImpactParameters(neg_dca, neg_cov_dca);
+        // -- pid
         auto *neg_track = fESD->GetTrack(v0->GetNindex());
         float neg_n_sigma_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kProton);
         float neg_n_sigma_kaon = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kKaon);
         float neg_n_sigma_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kPion);
-        // -- positive daughter
+        // -- momentum @ pca w.r.t. v0
+        double neg_px, neg_py, neg_pz;
+        v0->GetNPxPyPz(neg_px, neg_py, neg_pz);
+
+        // positive daughter
+        // -- state + cov. matrix
+        const auto *pos_param = v0->GetParamP();
+        double pos_position[3];  // non-initialized on purpose
+        pos_param->GetXYZ(pos_position);
+        double pos_momentum[3];  // non-initialized on purpose
+        pos_param->GetPxPyPz(pos_momentum);
+        double pos_cov_xyz_pxpypz[Common::NCovMatrixComponents_State6];  // non-initialized on purpose
+        pos_param->GetCovarianceXYZPxPyPz(pos_cov_xyz_pxpypz);
+        // -- dca w.r.t. pv
+        float pos_dca[2], pos_cov_dca[3];  // non-initialized on purpose
+        pos_param->GetImpactParameters(pos_dca, pos_cov_dca);
+        //-- pid
         auto *pos_track = fESD->GetTrack(v0->GetPindex());
         float pos_n_sigma_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kProton);
         float pos_n_sigma_kaon = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kKaon);
         float pos_n_sigma_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kPion);
+        //-- momentum @ pca w.r.t. v0
+        double pos_px, pos_py, pos_pz;
+        v0->GetPPxPyPz(pos_px, pos_py, pos_pz);
 
-        // (1) cut: pid
+        // reconstruct v0 //
+
+        TLorentzVector lv_antiproton(neg_px, neg_py, neg_pz, Common::Math::Hypot4(neg_px, neg_py, neg_pz, Common::PdgMass_Proton));
+        TLorentzVector lv_piminus(neg_px, neg_py, neg_pz, Common::Math::Hypot4(neg_px, neg_py, neg_pz, Common::PdgMass_Pion));
+        TLorentzVector lv_proton(pos_px, pos_py, pos_pz, Common::Math::Hypot4(pos_px, pos_py, pos_pz, Common::PdgMass_Proton));
+        TLorentzVector lv_piplus(pos_px, pos_py, pos_pz, Common::Math::Hypot4(pos_px, pos_py, pos_pz, Common::PdgMass_Pion));
+        TLorentzVector lv_antilambda = lv_antiproton + lv_piplus;
+        TLorentzVector lv_lambda = lv_proton + lv_piminus;
+
+        double delta_m_antilambda = std::abs(lv_antilambda.M() - Common::PdgMass_Lambda);
+        double delta_m_lambda = std::abs(lv_lambda.M() - Common::PdgMass_Lambda);
+
         bool neg_could_be_proton = std::abs(neg_n_sigma_proton) < 3.;
         bool neg_could_be_pion = std::abs(neg_n_sigma_pion) < 3.;
         bool pos_could_be_proton = std::abs(pos_n_sigma_proton) < 3.;
@@ -935,154 +685,78 @@ void AliTaskEsd2Vector::ProcessLambdas() {
         bool could_be_anti_lambda = neg_could_be_proton && pos_could_be_pion;
         if (!could_be_anti_lambda && !could_be_lambda) continue;
 
-        // get kinematics //
-        // -- negative daughter
-        double neg_px, neg_py, neg_pz;
-        v0->GetNPxPyPz(neg_px, neg_py, neg_pz);
-        TLorentzVector lv_antiproton(
-            neg_px, neg_py, neg_pz, std::sqrt(neg_px * neg_px + neg_py * neg_py + neg_pz * neg_pz + Common::PdgMass_Proton * Common::PdgMass_Proton));
-        TLorentzVector lv_piminus(neg_px, neg_py, neg_pz,
-                                  std::sqrt(neg_px * neg_px + neg_py * neg_py + neg_pz * neg_pz + Common::PdgMass_Pion * Common::PdgMass_Pion));
-        // -- positive daughter
-        double pos_px, pos_py, pos_pz;
-        v0->GetPPxPyPz(pos_px, pos_py, pos_pz);
-        TLorentzVector lv_proton(pos_px, pos_py, pos_pz,
-                                 std::sqrt(pos_px * pos_px + pos_py * pos_py + pos_pz * pos_pz + Common::PdgMass_Proton * Common::PdgMass_Proton));
-        TLorentzVector lv_piplus(pos_px, pos_py, pos_pz,
-                                 std::sqrt(pos_px * pos_px + pos_py * pos_py + pos_pz * pos_pz + Common::PdgMass_Pion * Common::PdgMass_Pion));
-        // -- lambda
-        TLorentzVector lv_antilambda = lv_antiproton + lv_piplus;
-        TLorentzVector lv_lambda = lv_proton + lv_piminus;
+        // apply cuts (2) -- pre-selection //
+        // -- as anti-lambda
+        double antilambda_arm_alpha = Common::Math::ArmenterosAlpha(lv_antilambda.Px(), lv_antilambda.Py(), lv_antilambda.Pz(),  //
+                                                                    lv_antiproton.Px(), lv_antiproton.Py(), lv_antiproton.Pz(),  //
+                                                                    lv_piplus.Px(), lv_piplus.Py(), lv_piplus.Pz())
+                                          .value_or(Common::DummyDouble);
+        double antilambda_arm_qt = Common::Math::ArmenterosQt(lv_antilambda.Px(), lv_antilambda.Py(), lv_antilambda.Pz(),  //
+                                                              lv_antiproton.Px(), lv_antiproton.Py(), lv_antiproton.Pz());
+        bool antilambda_valid_arm = antilambda_arm_qt / std::abs(antilambda_arm_alpha) < 0.2;
+        // -- as lambda
+        double lambda_arm_alpha = Common::Math::ArmenterosAlpha(lv_lambda.Px(), lv_lambda.Py(), lv_lambda.Pz(),     //
+                                                                lv_piminus.Px(), lv_piminus.Py(), lv_piminus.Pz(),  //
+                                                                lv_proton.Px(), lv_proton.Py(), lv_proton.Pz())
+                                      .value_or(Common::DummyDouble);
+        double lambda_arm_qt = Common::Math::ArmenterosQt(lv_lambda.Px(), lv_lambda.Py(), lv_lambda.Pz(),  //
+                                                          lv_piminus.Px(), lv_piminus.Py(), lv_piminus.Pz());
+        bool lambda_valid_arm = lambda_arm_qt / std::abs(lambda_arm_alpha) < 0.2;
 
-        double delta_m_antilambda = std::abs(lv_antilambda.M() - Common::PdgMass_Lambda);
-        double delta_m_lambda = std::abs(lv_lambda.M() - Common::PdgMass_Lambda);
+        if (!antilambda_valid_arm && !lambda_valid_arm) continue;
 
-        // (2) cut: mass
-        bool valid_delta_m_antilambda = could_be_anti_lambda && delta_m_antilambda < 0.01;
-        bool valid_delta_m_lambda = could_be_lambda && delta_m_lambda < 0.01;
-        if (!valid_delta_m_antilambda && !valid_delta_m_lambda) continue;
+#if E2R_VERBOSE
+        AliInfoF("id_v0=%i, id_neg=%i, id_pos=%i, mass_as_l=%f, mass_as_al=%f", entry_v0, v0->GetNindex(), v0->GetPindex(), lv_lambda.M(),
+                 lv_antilambda.M());
+#endif
 
-        // DEBUG
-        AliInfoF("v0_entry=%i, pos_id=%i, neg_id=%i, mass=%f", v0_entry, v0->GetPindex(), v0->GetNindex(),
-                 delta_m_antilambda < delta_m_lambda ? lv_antilambda.M() : lv_lambda.M());
-
-        // geometry //
-        // -- negative daughter
-        float neg_dca[2]{};
-        float neg_cov_dca[3]{};
-        neg_track->GetImpactParameters(neg_dca, neg_cov_dca);
-        // -- negative daughter
-        float pos_dca[2]{};
-        float pos_cov_dca[3]{};
-        pos_track->GetImpactParameters(pos_dca, pos_cov_dca);
-
-        // fill branches //
-        // -- (anti)lambda
-        fLambda.EsdEntry->emplace_back(static_cast<unsigned int>(v0_entry));
-        fLambda.Decay_X->emplace_back(static_cast<float>(v0->Xv()));
-        fLambda.Decay_Y->emplace_back(static_cast<float>(v0->Yv()));
-        fLambda.Decay_Z->emplace_back(static_cast<float>(v0->Zv()));
-        fLambda.Px->emplace_back(static_cast<float>(v0->Px()));
-        fLambda.Py->emplace_back(static_cast<float>(v0->Py()));
-        fLambda.Pz->emplace_back(static_cast<float>(v0->Pz()));
-        fLambda.DcaV0Daughters->emplace_back(static_cast<float>(v0->GetDcaV0Daughters()));
-        // -- negative daughter
-        fLambda.Neg_EsdEntry->emplace_back(static_cast<unsigned int>(v0->GetNindex()));
-        fLambda.Neg_PCAwrtV0_Px->emplace_back(static_cast<float>(neg_px));
-        fLambda.Neg_PCAwrtV0_Py->emplace_back(static_cast<float>(neg_py));
-        fLambda.Neg_PCAwrtV0_Pz->emplace_back(static_cast<float>(neg_pz));
-        fLambda.Neg_PreDCAxy->emplace_back(neg_dca[0]);
-        fLambda.Neg_PreDCAz->emplace_back(neg_dca[1]);
-        fLambda.Neg_NSigmaProton->emplace_back(neg_n_sigma_proton);
-        fLambda.Neg_NSigmaKaon->emplace_back(neg_n_sigma_kaon);
-        fLambda.Neg_NSigmaPion->emplace_back(neg_n_sigma_pion);
-        // -- positive daughter
-        fLambda.Pos_EsdEntry->emplace_back(static_cast<unsigned int>(v0->GetPindex()));
-        fLambda.Pos_PCAwrtV0_Px->emplace_back(static_cast<float>(pos_px));
-        fLambda.Pos_PCAwrtV0_Py->emplace_back(static_cast<float>(pos_py));
-        fLambda.Pos_PCAwrtV0_Pz->emplace_back(static_cast<float>(pos_pz));
-        fLambda.Pos_PreDCAxy->emplace_back(pos_dca[0]);
-        fLambda.Pos_PreDCAz->emplace_back(pos_dca[1]);
-        fLambda.Pos_NSigmaProton->emplace_back(pos_n_sigma_proton);
-        fLambda.Pos_NSigmaKaon->emplace_back(pos_n_sigma_kaon);
-        fLambda.Pos_NSigmaPion->emplace_back(pos_n_sigma_pion);
-        // -- mc link
-        if (fIsMC) {
-            fLambda.Neg_McEntry->emplace_back(std::abs(neg_track->GetLabel()));
-            fLambda.Pos_McEntry->emplace_back(std::abs(pos_track->GetLabel()));
+        // create new //
+        POD::PreFoundLambda new_lambda;  // non-initialized on purpose
+        new_lambda.PreFoundEntry = static_cast<unsigned int>(entry_v0);
+        new_lambda.Decay_X = static_cast<float>(v0->Xv());
+        new_lambda.Decay_Y = static_cast<float>(v0->Yv());
+        new_lambda.Decay_Z = static_cast<float>(v0->Zv());
+        new_lambda.DcaV0Daughters = static_cast<float>(v0->GetDcaV0Daughters());
+        // negative daughter
+        new_lambda.Neg_EsdEntry = static_cast<unsigned int>(v0->GetNindex());
+        new_lambda.Neg_State = {static_cast<float>(neg_position[0]), static_cast<float>(neg_position[1]), static_cast<float>(neg_position[2]),
+                                static_cast<float>(neg_momentum[0]), static_cast<float>(neg_momentum[1]), static_cast<float>(neg_momentum[2])};
+        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
+            new_lambda.Neg_CovMatrix[idx_cov] = static_cast<float>(neg_cov_xyz_pxpypz[idx_cov]);
         }
-    }
-}
+        new_lambda.Neg_PreDCAxy = neg_dca[0];
+        new_lambda.Neg_PreDCAz = neg_dca[1];
+        new_lambda.Neg_NSigmaProton = neg_n_sigma_proton;
+        new_lambda.Neg_NSigmaKaon = neg_n_sigma_kaon;
+        new_lambda.Neg_NSigmaPion = neg_n_sigma_pion;
+        // -- related to (anti)lambda
+        new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_px);
+        new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_py);
+        new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_pz);
+        // positive daughter
+        new_lambda.Pos_EsdEntry = static_cast<unsigned int>(v0->GetPindex());
+        new_lambda.Pos_State = {static_cast<float>(pos_position[0]), static_cast<float>(pos_position[1]), static_cast<float>(pos_position[2]),
+                                static_cast<float>(pos_momentum[0]), static_cast<float>(pos_momentum[1]), static_cast<float>(pos_momentum[2])};
+        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
+            new_lambda.Pos_CovMatrix[idx_cov] = static_cast<float>(pos_cov_xyz_pxpypz[idx_cov]);
+        }
+        new_lambda.Pos_PreDCAxy = pos_dca[0];
+        new_lambda.Pos_PreDCAz = pos_dca[1];
+        new_lambda.Pos_NSigmaProton = pos_n_sigma_proton;
+        new_lambda.Pos_NSigmaKaon = pos_n_sigma_kaon;
+        new_lambda.Pos_NSigmaPion = pos_n_sigma_pion;
+        // -- related to (anti)lambda
+        new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_px);
+        new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_py);
+        new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_pz);
 
-void AliTaskEsd2Vector::ReserveBranches_Lambdas(std::size_t size) {
-    fLambda.EsdEntry->reserve(size);
-    fLambda.Decay_X->reserve(size);
-    fLambda.Decay_Y->reserve(size);
-    fLambda.Decay_Z->reserve(size);
-    fLambda.Px->reserve(size);
-    fLambda.Py->reserve(size);
-    fLambda.Pz->reserve(size);
-    fLambda.DcaV0Daughters->reserve(size);
-    // -- negative daughter
-    fLambda.Neg_EsdEntry->reserve(size);
-    fLambda.Neg_PCAwrtV0_Px->reserve(size);
-    fLambda.Neg_PCAwrtV0_Py->reserve(size);
-    fLambda.Neg_PCAwrtV0_Pz->reserve(size);
-    fLambda.Neg_PreDCAxy->reserve(size);
-    fLambda.Neg_PreDCAz->reserve(size);
-    fLambda.Neg_NSigmaProton->reserve(size);
-    fLambda.Neg_NSigmaKaon->reserve(size);
-    fLambda.Neg_NSigmaPion->reserve(size);
-    // -- positive daughter
-    fLambda.Pos_EsdEntry->reserve(size);
-    fLambda.Pos_PCAwrtV0_Px->reserve(size);
-    fLambda.Pos_PCAwrtV0_Py->reserve(size);
-    fLambda.Pos_PCAwrtV0_Pz->reserve(size);
-    fLambda.Pos_PreDCAxy->reserve(size);
-    fLambda.Pos_PreDCAz->reserve(size);
-    fLambda.Pos_NSigmaProton->reserve(size);
-    fLambda.Pos_NSigmaKaon->reserve(size);
-    fLambda.Pos_NSigmaPion->reserve(size);
-    // -- mc link
-    if (fIsMC) {
-        fLambda.Neg_McEntry->reserve(size);
-        fLambda.Pos_McEntry->reserve(size);
-    }
-}
-
-void AliTaskEsd2Vector::ClearBranches_Lambdas() {
-    fLambda.EsdEntry->clear();
-    fLambda.Decay_X->clear();
-    fLambda.Decay_Y->clear();
-    fLambda.Decay_Z->clear();
-    fLambda.Px->clear();
-    fLambda.Py->clear();
-    fLambda.Pz->clear();
-    fLambda.DcaV0Daughters->clear();
-    // -- negative daughter
-    fLambda.Neg_EsdEntry->clear();
-    fLambda.Neg_PCAwrtV0_Px->clear();
-    fLambda.Neg_PCAwrtV0_Py->clear();
-    fLambda.Neg_PCAwrtV0_Pz->clear();
-    fLambda.Neg_PreDCAxy->clear();
-    fLambda.Neg_PreDCAz->clear();
-    fLambda.Neg_NSigmaProton->clear();
-    fLambda.Neg_NSigmaKaon->clear();
-    fLambda.Neg_NSigmaPion->clear();
-    // -- positive daughter
-    fLambda.Pos_EsdEntry->clear();
-    fLambda.Pos_PCAwrtV0_Px->clear();
-    fLambda.Pos_PCAwrtV0_Py->clear();
-    fLambda.Pos_PCAwrtV0_Pz->clear();
-    fLambda.Pos_PreDCAxy->clear();
-    fLambda.Pos_PreDCAz->clear();
-    fLambda.Pos_NSigmaProton->clear();
-    fLambda.Pos_NSigmaKaon->clear();
-    fLambda.Pos_NSigmaPion->clear();
-    // -- mc link
-    if (fIsMC) {
-        fLambda.Neg_McEntry->clear();
-        fLambda.Pos_McEntry->clear();
+        // push reconstructed //
+        fOutput.PreFoundLambda.emplace_back(new_lambda);
+        // push mc info //
+        if (fIsMC) {
+            fOutput.PreFoundLambda_Neg_McEntry.emplace_back(std::abs(neg_track->GetLabel()));
+            fOutput.PreFoundLambda_Pos_McEntry.emplace_back(std::abs(pos_track->GetLabel()));
+        }
     }
 }
 
@@ -1090,15 +764,21 @@ void AliTaskEsd2Vector::ClearBranches_Lambdas() {
 
 // Store the in-memory values into the tree branches.
 void AliTaskEsd2Vector::ProcessInjectedReactions() {
-    ReserveBranches_Injected();
-    for (int r = 0; r < E2R::NReactionsPerEvent; ++r) {
-        fInjectedSexa.ReactionID->emplace_back(fEvVec_ReactionID[*fEvent.EventNumber][r]);
-        fInjectedSexa.Px->emplace_back(fEvVec_Sexaquark_Px[*fEvent.EventNumber][r]);
-        fInjectedSexa.Py->emplace_back(fEvVec_Sexaquark_Py[*fEvent.EventNumber][r]);
-        fInjectedSexa.Pz->emplace_back(fEvVec_Sexaquark_Pz[*fEvent.EventNumber][r]);
-        fInjectedSexa.Nucleon_Px->emplace_back(fEvVec_Nucleon_Px[*fEvent.EventNumber][r]);
-        fInjectedSexa.Nucleon_Py->emplace_back(fEvVec_Nucleon_Py[*fEvent.EventNumber][r]);
-        fInjectedSexa.Nucleon_Pz->emplace_back(fEvVec_Nucleon_Pz[*fEvent.EventNumber][r]);
+    // vector preallocation //
+    fOutput.InjectedSexa.reserve(E2R::NSexaReactionsPerEvent);
+
+    for (int r = 0; r < E2R::NSexaReactionsPerEvent; ++r) {
+        // create new //
+        POD::InjectedSexa new_injected{fEvVec_ReactionID[fOutput.Event.EventNumber][r],    //
+                                       fEvVec_Sexaquark_Px[fOutput.Event.EventNumber][r],  //
+                                       fEvVec_Sexaquark_Py[fOutput.Event.EventNumber][r],  //
+                                       fEvVec_Sexaquark_Pz[fOutput.Event.EventNumber][r],  //
+                                       fEvVec_Nucleon_Px[fOutput.Event.EventNumber][r],    //
+                                       fEvVec_Nucleon_Py[fOutput.Event.EventNumber][r],    //
+                                       fEvVec_Nucleon_Pz[fOutput.Event.EventNumber][r]};
+
+        // push //
+        fOutput.InjectedSexa.emplace_back(new_injected);
     }
 }
 
@@ -1117,7 +797,7 @@ void AliTaskEsd2Vector::BringSignalLogs() {
     AliInfoF("Copying file %s ...", orig_path.Data());
 
     // assuming path ends with format `.../LHC23l1a3/A1.73/297595/001/sim.log` //
-    auto AliEn_DirNumber = static_cast<int>(*fEvent.DirNumber);
+    auto AliEn_DirNumber = static_cast<int>(fOutput.Event.DirNumber);
 
     TObjArray *tokens = fAliEnPath.Tokenize("/");
     auto AliEn_RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens->GetEntries() - 3)))->GetString().Atoi();
@@ -1184,9 +864,9 @@ bool AliTaskEsd2Vector::ReadSignalLogs() {
         }
     }  // finish reading lines
 
-#if E2V_DEBUG
-    for (int ev_print = 0; ev_print < Const::NEventsInDedicatedMC; ++ev_print) {
-        for (int r_print = 0; r_print < Const::NReactionsPerEvent; ++r_print) {
+#if E2R_VERBOSE
+    for (int ev_print = 0; ev_print < E2R::NEventsInDedicatedMC; ++ev_print) {
+        for (int r_print = 0; r_print < E2R::NSexaReactionsPerEvent; ++r_print) {
             std::cout << "Event " << ev_print << ", Reaction " << r_print << ":" << '\n';
             std::cout << "  ReactionID: " << fEvVec_ReactionID[ev_print][r_print] << '\n';
             std::cout << "  Px: " << fEvVec_Sexaquark_Px[ev_print][r_print] << ", Py: " << fEvVec_Sexaquark_Py[ev_print][r_print]
@@ -1201,26 +881,4 @@ bool AliTaskEsd2Vector::ReadSignalLogs() {
     SimLogFile.close();
 
     return true;
-}
-
-// Reserve injected reactions-related vectors' memory allocation.
-void AliTaskEsd2Vector::ReserveBranches_Injected() {
-    fInjectedSexa.ReactionID->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Px->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Py->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Pz->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Nucleon_Px->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Nucleon_Py->reserve(E2R::NReactionsPerEvent);
-    fInjectedSexa.Nucleon_Pz->reserve(E2R::NReactionsPerEvent);
-}
-
-// Clear the branches of the injected reactions.
-void AliTaskEsd2Vector::ClearBranches_Injected() {
-    fInjectedSexa.ReactionID->clear();
-    fInjectedSexa.Px->clear();
-    fInjectedSexa.Py->clear();
-    fInjectedSexa.Pz->clear();
-    fInjectedSexa.Nucleon_Px->clear();
-    fInjectedSexa.Nucleon_Py->clear();
-    fInjectedSexa.Nucleon_Pz->clear();
 }

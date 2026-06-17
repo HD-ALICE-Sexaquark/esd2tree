@@ -2,7 +2,7 @@
 
 #include "AliTaskEsd2Vector.h"
 
-AliTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
+AliTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_sexa_mc, bool is_hdib_mc) {
 
     AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
     if (mgr == nullptr) return nullptr;
@@ -11,7 +11,7 @@ AliTaskEsd2Vector *AddTaskEsd2Vector(bool is_mc, bool is_signal_mc) {
     if (task == nullptr) return nullptr;
 
     // NOTE: `SelectCollisionCandidates` omitted because it's done within the task's `PassesEventSelection`
-    task->Initialize(is_mc, is_signal_mc);
+    task->Initialize(is_mc, is_sexa_mc, is_hdib_mc);
 
     mgr->AddTask(task);
     mgr->ConnectInput(task, 0, mgr->GetCommonInputContainer());

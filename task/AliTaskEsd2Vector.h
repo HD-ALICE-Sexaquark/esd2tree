@@ -10,11 +10,8 @@
 #include <AliEventCuts.h>
 
 #include "Constants.hpp"
-#include "E2R_Event.hpp"
-#include "E2R_InjectedSexa.hpp"
-#include "E2R_Lambda.hpp"
-#include "E2R_McParticle.hpp"
-#include "E2R_Track.hpp"
+#include "Framework.hpp"
+#include "Schema_Events.hpp"
 
 class TClass;
 class TBits;
@@ -50,21 +47,14 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
     AliTaskEsd2Vector& operator=(AliTaskEsd2Vector&&) = delete;
 
     // Settings ~ stored in Analysis Manager //
-    void Initialize(bool is_mc, bool is_signal_mc = false);
+    void Initialize(bool is_mc, bool is_signal_mc = false, bool is_hdib_mc = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
     bool UserNotify();
     void UserExec(Option_t* option);
-    void FinishTaskOutput();  // close & write footer per worker
+    void FinishTaskOutput();
     void Terminate(Option_t* option) {}
-
-    // Tree //
-    void CreateEventsBranches(ROOT::RNTupleModel* model);
-    void CreateMCBranches(ROOT::RNTupleModel* model);
-    void CreateTracksBranches(ROOT::RNTupleModel* model);
-    void CreateLambdasBranches(ROOT::RNTupleModel* model);
-    void CreateInjectedBranches(ROOT::RNTupleModel* model);
 
     // Events //
     bool ProcessEvent();
@@ -72,26 +62,18 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
 
     // MC Particles //
     void ProcessMCParticles();
-    void ReserveBranches_MC(std::size_t size);
-    void ClearBranches_MC();
 
     // Tracks //
     void ProcessTracks();
     bool PassesTrackSelection(const AliESDtrack* track);
-    void ReserveBranches_Tracks(std::size_t size);
-    void ClearBranches_Tracks();
 
     // (Anti)Lambdas //
-    void ProcessLambdas();
-    void ReserveBranches_Lambdas(std::size_t size);
-    void ClearBranches_Lambdas();
+    void ProcessPreFoundLambdas();
 
     // Injected Reactions //
     void ProcessInjectedReactions();
     void BringSignalLogs();
     bool ReadSignalLogs();
-    void ReserveBranches_Injected();
-    void ClearBranches_Injected();
 
     // Utilities //
     static int GetFirstRowFromTPCClusterMap(const AliESDtrack* track) {
@@ -115,8 +97,12 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
 
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
-    bool fIsMC;        // kTRUE if MC simulation, kFALSE if data
-    bool fIsSignalMC;  // kTRUE to read and load signal logs
+    bool fIsMC;                     // kTRUE if MC simulation, kFALSE if data
+    bool fIsMC_DedicatedSexaquark;  // kTRUE to read and load signal logs
+    bool fIsMC_DedicatedHdibaryon;  //
+
+    // -- helper
+    bool fIsFirstEvent;  //!
 
     // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
@@ -127,15 +113,15 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
     AliEventCuts fEventCuts;              //! event cuts
 
     // Signal Logs //
-    TString fAliEnPath;                                                                                     //! loaded in `UserNotify()`
-    TString fSignalLog_NewBasename;                                                                         //!
-    std::array<std::array<int, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Pz;  //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Px;    //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Py;    //!
-    std::array<std::array<float, E2R::NReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Pz;    //!
+    TString fAliEnPath;                                                                                         //! loaded in `UserNotify()`
+    TString fSignalLog_NewBasename;                                                                             //!
+    std::array<std::array<int, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Pz;  //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Px;    //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Py;    //!
+    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Pz;    //!
 
     // Output //
 
@@ -147,13 +133,9 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
     TH1F* fHist_Tracks_Bookkeeping;  //!
 
     // -- RNTuple
-    TFile* fOutput_AltFile;                        //! output file owned by the task
-    std::unique_ptr<ROOT::RNTupleWriter> fWriter;  //!
-    E2R::Event fEvent;                             //!
-    E2R::InjectedSexa fInjectedSexa;               //!
-    E2R::McParticle fMcParticle;                   //!
-    E2R::Track fTrack;                             //!
-    E2R::Lambda fLambda;                           //!
+    std::unique_ptr<TFile> fOutput_AltFile;      //!
+    Schema::Events fOutput;                      //!
+    std::unique_ptr<Framework::Writer> fWriter;  //!
 
-    ClassDef(AliTaskEsd2Vector, 2);  // = number of persistent members
+    ClassDef(AliTaskEsd2Vector, 2);
 };

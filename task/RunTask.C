@@ -16,39 +16,40 @@
 
 #include "AliTaskEsd2Vector.h"
 
-void RunTask(const TString &Mode,            // "local", "grid"
-             const TString &InputPath,       // what comes before the RN
-             const TString &ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
-                                             // for signal MC: "LHC23l1a3", "LHC23l1b3"
-                                             // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
-             int RunNumber,                  // single run number
-             /* only valid when "local" or "grid+test" */
-             int NDirs = 1,  // for MC: number of subdirs per run
-                             // for data: number of dirs that share same prefix (to be used with `Grid_CustomDataPattern`)
+void RunTask(const char *Mode,            // "local", "grid"
+             const char *InputPath,       // what comes before the RN
+             const char *ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
+                                          // for sexa MC: "LHC23l1a3", "LHC23l1b3"
+                                          // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
+                                          // for hdib MC: "LHC26h"
+             int RunNumber,               // single run number
              /* only valid when "local" */
+             int Local_NDirs = 1,                 // number of subdirs~files to run
              long long Local_LimitToNEvents = 0,  // 0 means all events
              /* only valid when "grid" */
-             bool Grid_TestMode = false,                 //
-             const TString &Grid_WorkingDir = "",        //
-             int Grid_CustomSplitMaxNFiles = 0,          // 0 means default
-             const TString &Grid_CustomDataPattern = ""  // what comes after the RN, empty means default
+             const char *Grid_WorkingDir = "",  // customize output dirs, relative to GRID's home dir
+             const char *Grid_CustomXML = ""    // if not empty, get input files from custom XML instead of automatically generating one
 ) {
 
     // # Derive Options # //
 
-    bool IsMC = ProductionName.Contains("LHC2");
-    bool IsSignalMC = ProductionName.Contains("23l1");
+    bool IsMC = TString(ProductionName).Contains("LHC2");
+    bool IsSexaMC = TString(ProductionName).Contains("23l1");
+    bool IsHdibMC = TString(ProductionName).Contains("26h");
 
     int SplitMaxNFiles = 60;        // default for data
-    if (IsMC) SplitMaxNFiles = 10;  // default for MC
-    if (Grid_CustomSplitMaxNFiles > 0) SplitMaxNFiles = Grid_CustomSplitMaxNFiles;
+    if (IsMC) SplitMaxNFiles = 12;  // default for MC
 
     int PassNumber = 3;  // default for 18qr and anchored sims
-    if (ProductionName == "LHC15o" || ProductionName == "LHC20j6a" || ProductionName == "LHC23l1b3") PassNumber = 2;
+    if (RunNumber >= 244917 && RunNumber <= 246994) PassNumber = 2;
 
     TString GridDataPattern = TString::Format("/pass%i/*/AliESDs.root", PassNumber);  // default for data
     if (IsMC) GridDataPattern = "/*/AliESDs.root";                                    // default for MC
-    if (Grid_CustomDataPattern.Length() > 0) GridDataPattern = Grid_CustomDataPattern;
+
+    int TimeToLive = 14400;       // seconds, = 4 hours
+    if (IsMC) TimeToLive = 7200;  // seconds, = 2 hours
+
+    bool AutomaticSearchESDs = TString(Grid_CustomXML) == "";
 
     // # Start # //
 
@@ -64,30 +65,37 @@ void RunTask(const TString &Mode,            // "local", "grid"
 
     AliAnalysisAlien *alienHandler = nullptr;
 
-    if (Mode == "grid") {
+    if (TString(Mode) == "grid") {
         alienHandler = new AliAnalysisAlien();
         alienHandler->SetCheckCopy(false);
+        alienHandler->SetExecutableCommand("aliroot -l -b -q -x");
         alienHandler->AddIncludePath("-I. -I$ROOTSYS/include -I$ALICE_ROOT -I$ALICE_ROOT/include -I$ALICE_PHYSICS/include");
         alienHandler->SetAdditionalLibs(
-            "AliTaskEsd2Vector.cxx AliTaskEsd2Vector.h Constants.hpp E2R_Cuts.hpp E2R_Event.hpp E2R_InjectedSexa.hpp E2R_Lambda.hpp "
-            "E2R_McParticle.hpp E2R_Track.hpp");
-        alienHandler->SetAnalysisSource("AliTaskEsd2Vector.cxx");
-        alienHandler->SetAliPhysicsVersion("vAN-20250907_O2-1");
-        alienHandler->SetExecutableCommand("aliroot -l -q -b");
-        alienHandler->SetGridDataDir(InputPath);
-        if (!IsMC) alienHandler->SetRunPrefix("000");
-        alienHandler->AddRunNumber(RunNumber);
-        alienHandler->SetDataPattern(GridDataPattern);
-        alienHandler->SetTTL(3600);
-        alienHandler->SetOutputToRunNo(static_cast<int>(true));
+            "AliTaskEsd2Vector.cxx AliTaskEsd2Vector.h Constants.hpp Framework.hpp Math.hpp Schema_Events.hpp POD_Event.hpp POD_InjectedSexa.hpp "
+            "POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp E2R_Cuts.hpp");
+        alienHandler->SetTTL(TimeToLive);
         alienHandler->SetDefaultOutputs(false);
-        alienHandler->SetOutputFiles("AnalysisResults.root EventsRNT.root");
+        alienHandler->SetOutputFiles("AnalysisResults.root,EventsRNT.root");
         alienHandler->SetOutputArchive("");
         alienHandler->SetKeepLogs(true);
         alienHandler->SetMergeViaJDL(false);
         alienHandler->SetGridWorkingDir(Grid_WorkingDir);
+        alienHandler->SetAnalysisSource("AliTaskEsd2Vector.cxx");
         alienHandler->SetJDLName("TaskEsd2Vector.jdl");
         alienHandler->SetExecutable("TaskEsd2Vector.sh");
+        alienHandler->SetAliPhysicsVersion("vAN-20260616_O2-1");  // see latest available in https://alimonitor.cern.ch/packages/
+
+        alienHandler->SetOutputToRunNo(1);  // output-subdir will inherit xml's filename
+        if (AutomaticSearchESDs) {
+            if (!IsMC) alienHandler->SetRunPrefix("000");
+            alienHandler->AddRunNumber(RunNumber);
+            alienHandler->SetGridDataDir(InputPath);
+            alienHandler->SetDataPattern(GridDataPattern);
+        } else {
+            alienHandler->AddDataFile(Grid_CustomXML);
+        }
+        alienHandler->SetSplitMaxInputFileNumber(SplitMaxNFiles);
+        alienHandler->SetRunMode("full");  // PENDING
 
         mgr->SetGridHandler(alienHandler);
 
@@ -97,7 +105,7 @@ void RunTask(const TString &Mode,            // "local", "grid"
     // # Input Handlers # //
 
     AliESDInputHandler *esdH = new AliESDInputHandler();
-    esdH->SetNeedField();  // necessary to get GoldenChi2
+    // esdH->SetNeedField();  // necessary to get GoldenChi2
     mgr->SetInputEventHandler(esdH);
 
     AliMCEventHandler *mcH = nullptr;
@@ -116,13 +124,19 @@ void RunTask(const TString &Mode,            // "local", "grid"
     bool applyPileupCuts = false;
     TString TaskPhysicsSelection_Options = TString::Format("(%i, %i)", (int)IsMC, (int)applyPileupCuts);
     auto *TaskPhysicsSelection = reinterpret_cast<AliPhysicsSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options));
+        gInterpreter->ExecuteMacro("${ALICE_PHYSICS}/OADB/macros/AddTaskPhysicsSelection.C" + TaskPhysicsSelection_Options));
     if (TaskPhysicsSelection == nullptr) return;
 
     TString TaskCentrality_Options = "";  // nothing
     auto *TaskCentrality = reinterpret_cast<AliMultSelectionTask *>(
-        gInterpreter->ExecuteMacro("$ALICE_PHYSICS/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options));
+        gInterpreter->ExecuteMacro("${ALICE_PHYSICS}/OADB/COMMON/MULTIPLICITY/macros/AddTaskMultSelection.C" + TaskCentrality_Options));
     if (TaskCentrality == nullptr) return;
+    if (IsMC) {
+        TString AnchoredProdName = "LHC15o";
+        if (RunNumber >= 295581 && RunNumber <= 296689) AnchoredProdName = "LHC18q";
+        if (RunNumber >= 296690 && RunNumber <= 300000) AnchoredProdName = "LHC18r";
+        TaskCentrality->SetAlternateOADBforEstimators(AnchoredProdName + "-DefaultMC-HIJING_V0fix");
+    }
 
     // References:
     // https://twiki.cern.ch/twiki/bin/viewauth/ALICE/PIDInAnalysis
@@ -158,7 +172,7 @@ void RunTask(const TString &Mode,            // "local", "grid"
 
     gInterpreter->LoadMacro("AliTaskEsd2Vector.cxx++g");
 
-    TString TaskEsd2Vector_Options = TString::Format("(%i, %i)", (int)IsMC, (int)IsSignalMC);
+    TString TaskEsd2Vector_Options = TString::Format("(%i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC);
     AliTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliTaskEsd2Vector *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options));
     if (TaskEsd2Vector == nullptr) return;
@@ -177,27 +191,26 @@ void RunTask(const TString &Mode,            // "local", "grid"
     TChain *chain = nullptr;
     TString FilePath = "";
 
-    if (Mode == "grid") {
-        if (Grid_TestMode) {
-            alienHandler->SetNtestFiles(NDirs);
-            alienHandler->SetRunMode("test");
-        } else {
-            alienHandler->SetSplitMaxInputFileNumber(SplitMaxNFiles);
-            alienHandler->SetRunMode("full");
-        }
+    if (TString(Mode) == "grid") {
+        // grid mode //
+        // alienHandler->SetNtestFiles(Local_NDirs);  // PENDING
+        // alienHandler->SetRunMode("test");          // PENDING
         mgr->StartAnalysis("grid");
-    } else {  // local mode
+    } else {
+        // local mode //
         chain = new TChain("esdTree");
         if (IsMC) {
-            for (int DN = 1; DN <= NDirs; ++DN) {
-                FilePath = TString::Format("%s/%i/%03i/AliESDs.root", InputPath.Data(), RunNumber, DN);
+            for (int DN = 1; DN <= Local_NDirs; ++DN) {
+                FilePath = TString::Format("%s/%i/%03i/AliESDs.root", InputPath, RunNumber, DN);
                 std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }
         } else {  // data
-            TString top_path = TString::Format("%s/000%i/pass%i", InputPath.Data(), RunNumber, PassNumber);
+            TString top_path = TString::Format("%s/000%i/pass%i", InputPath, RunNumber, PassNumber);
             TSystemDirectory top_dir(top_path, top_path);
+            int dir_counter = 0;
             for (auto *file : *top_dir.GetListOfFiles()) {
+                if (Local_NDirs > 0 && dir_counter == Local_NDirs) break;
                 auto *one_dir = dynamic_cast<TSystemDirectory *>(file);
                 if (strcmp(one_dir->GetName(), ".") == 0 || strcmp(one_dir->GetName(), "..") == 0) continue;
                 if (!one_dir->IsDirectory()) continue;
@@ -205,6 +218,7 @@ void RunTask(const TString &Mode,            // "local", "grid"
                 if (gSystem->AccessPathName(FilePath)) continue;
                 std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
+                dir_counter++;
             }
         }
         if (Local_LimitToNEvents == 0)
