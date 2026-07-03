@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# `esd2vector/scripts/farm-pi/mc_task_wrapper.sh`
+# ==============================================
+# Send MC jobs to the Slurm farm.
+
+set -euo pipefail
+
+# hardcoded options #
+
+export MODE="local"
+export LOCAL_N_DIRS=6
+MAX_PARALLEL_JOBS=60
+reaction_channels=("A") # "A" "D" "H"
+injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
+
+# functions #
+
+print_usage() { echo "usage: ./mc_task_wrapper.sh [LHC23l1a3,LHC23l1b3,LHC26h]"; }
+
+# check environment
+if [[ -z ${LOCAL_SIMS_DIR:-} ]]; then echo "error: missing env. var. LOCAL_SIMS_DIR"; exit 1; fi
+if [[ -z ${E2R_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2R_ROOT_DIR"; exit 1; fi
+mkdir -p "${E2R_ROOT_DIR}/slurm"
+
+# command-line arguments
+if [[ $# -ne 1 ]]; then print_usage; exit 1; fi
+export PRODUCTION_NAME="$1"
+
+# validate input args
+if [[ "$1" != "LHC23l1a3" && "$1" != "LHC23l1b3" && "$1" != "LHC26h" ]]; then print_usage; exit 1; fi
+
+# define strings (NOTE: not arrays, because Slurm)
+export CHANNELS_STR=""
+export MASSES_STR=""
+export RUN_NUMBERS_STR=""
+
+input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}
+
+if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then
+    # loop over <input_path>/<r_channel><s_mass>/<rn_dir>
+    for r_channel in "${reaction_channels[@]}"; do
+        for s_mass in "${injected_masses[@]}"; do
+            for rn_dir in "${input_path}/${r_channel}${s_mass}"/*/; do
+                CHANNELS_STR+="${r_channel} "
+                MASSES_STR+="${s_mass} "
+                RUN_NUMBERS_STR+="$(basename "${rn_dir}") "
+            done
+        done
+    done
+else
+    # loop over <input_path>/<rn_dir>
+    for rn_dir in "${input_path}"/signal/*/; do
+        RUN_NUMBERS_STR+="$(basename "${rn_dir}") "
+    done
+fi
+
+n_total_jobs=$(echo "${RUN_NUMBERS_STR}" | wc -w)
+array_max=$((n_total_jobs - 1))
+
+mkdir -p "${E2R_ROOT_DIR}/slurm/tmp"
+
+sbatch \
+    --output="${E2R_ROOT_DIR}/slurm/tmp/%A_%a.log" \
+    --array="0-${array_max}%${MAX_PARALLEL_JOBS}" \
+    -- "${E2R_ROOT_DIR}/scripts/farm-pi/mc_task_exec.sh"
+
+echo "$0 @ ${HOSTNAME} :: a total of ${n_total_jobs} jobs have been submitted"

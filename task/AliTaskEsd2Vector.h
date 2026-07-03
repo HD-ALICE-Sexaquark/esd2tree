@@ -10,8 +10,10 @@
 #include <AliEventCuts.h>
 
 #include "Constants.hpp"
-#include "Framework.hpp"
+#include "Framework_TeeTree.hpp"
 #include "Schema_Events.hpp"
+
+#include "AliTaskEsd2Vector_LinkDef.h"
 
 class TClass;
 class TBits;
@@ -24,48 +26,65 @@ class TObjString;
 class TString;
 class TTree;
 
-namespace ROOT {
-class RNTupleModel;
-class RNTupleWriter;
-}  // namespace ROOT
-
 class AliESDEvent;
 class AliESDVertex;
 class AliMCEvent;
 class AliVVertex;
 class AliPIDResponse;
 
-class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
+class AliTaskEsd2Vector : public AliAnalysisTaskSE {
+
+    enum ETrack {
+        kAllTracks,
+        kValidStatusTPC_1,
+        kValidStatusTPC_2,
+        kNoHitInITS,
+        kPassesDcaCuts,
+        kPassesAbsMaxPz,
+        kPassesMinPt,
+        kPassesMaxPt,
+        kPassesAbsMaxEta,
+        kHasValidPid,
+        kPidWithinRange,
+        kPassesMinNTPCClusters,
+        kPassesChi2NClusters,
+        kNotAKink,
+        kNTrackCuts,
+    };
+
+    enum EPreFoundLambda {
+        kAllPreFoundV0s,
+        kOnTheFlyV0s,
+        kNegDaughterHasValidPid,
+        kPosDaughterHasValidPid,
+        kPassesPid,
+        kPassesInvariantMass,
+        kPassesArmenterosPodolanski,
+        kNPreFoundLambdaCuts,
+    };
+
    public:
     AliTaskEsd2Vector(const char* name);
     AliTaskEsd2Vector();
     ~AliTaskEsd2Vector();
 
-    AliTaskEsd2Vector(const AliTaskEsd2Vector&) = delete;
-    AliTaskEsd2Vector& operator=(const AliTaskEsd2Vector&) = delete;
-    AliTaskEsd2Vector(AliTaskEsd2Vector&&) = delete;
-    AliTaskEsd2Vector& operator=(AliTaskEsd2Vector&&) = delete;
-
     // Settings ~ stored in Analysis Manager //
-    void Initialize(bool is_mc, bool is_signal_mc = false, bool is_hdib_mc = false);
+    void Initialize(bool is_mc, bool is_sexa_mc = false, bool is_hdib_mc = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
     bool UserNotify();
     void UserExec(Option_t* option);
-    void FinishTaskOutput();
     void Terminate(Option_t* option) {}
 
     // Events //
     bool ProcessEvent();
-    bool PassesEventSelection();
 
     // MC Particles //
     void ProcessMCParticles();
 
     // Tracks //
     void ProcessTracks();
-    bool PassesTrackSelection(const AliESDtrack* track);
 
     // (Anti)Lambdas //
     void ProcessPreFoundLambdas();
@@ -76,11 +95,10 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
     bool ReadSignalLogs();
 
     // Utilities //
-    static int GetFirstRowFromTPCClusterMap(const AliESDtrack* track) {
-        const TBits& clMap = track->GetTPCClusterMap();
+    static int GetFirstRow(const TBits& map) {
         int firstRow = -1;  // default value
         for (int i = 0; i < 159; ++i) {
-            if (clMap.TestBitNumber(i)) {
+            if (map.TestBitNumber(i)) {
                 firstRow = i;
                 break;
             }
@@ -88,21 +106,11 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
         return firstRow;
     }
 
-    static int GetFirstLayerFromITS(const AliESDtrack* track) {
-        for (int iLayer = 0; iLayer < 6; ++iLayer) {
-            if (track->HasPointOnITSLayer(iLayer)) return iLayer;
-        }
-        return -1;  // no hit in any layer
-    }
-
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
     bool fIsMC;                     // kTRUE if MC simulation, kFALSE if data
     bool fIsMC_DedicatedSexaquark;  // kTRUE to read and load signal logs
     bool fIsMC_DedicatedHdibaryon;  //
-
-    // -- helper
-    bool fIsFirstEvent;  //!
 
     // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
@@ -126,16 +134,16 @@ class AliTaskEsd2Vector final : public AliAnalysisTaskSE {
     // Output //
 
     // -- QA Histograms
-    TList* fOutputList;              //!
-    TH1F* fHist_Events_Bookkeeping;  //!
-    TH1F* fHist_Centrality;          //!
-    TH1F* fHist_CentralityINT7;      //!
-    TH1F* fHist_Tracks_Bookkeeping;  //!
+    TList* fOutputList;                       //!
+    TH1F* fHist_Centrality;                   //!
+    TH1F* fHist_CentralityINT7;               //!
+    TH1F* fHist_Tracks_Bookkeeping;           //!
+    TH1F* fHist_PreFoundLambdas_Bookkeeping;  //!
 
-    // -- RNTuple
-    std::unique_ptr<TFile> fOutput_AltFile;      //!
-    Schema::Events fOutput;                      //!
-    std::unique_ptr<Framework::Writer> fWriter;  //!
+    // -- Tree
+    TTree* fOutputTree;                                   //!
+    Schema::Events fOutput;                               //!
+    std::unique_ptr<Framework::TeeTree::Writer> fWriter;  //!
 
     ClassDef(AliTaskEsd2Vector, 2);
 };

@@ -50,21 +50,21 @@ for index in "${!arr_custom_xml[@]}"; do
 
     cd "${attempt_dir}"
 
+    # copy task files
     cp "${E2R_ROOT_DIR}/task/RunTask.C" .
     cp "${E2R_ROOT_DIR}/task/AddTaskEsd2Vector.C" .
     cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.cxx" .
     cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.h" .
+    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector_LinkDef.h" .
     cp "${E2R_ROOT_DIR}/common/Constants.hpp" .
-    cp "${E2R_ROOT_DIR}/common/Framework.hpp" .
-    cp "${E2R_ROOT_DIR}/common/Math.hpp" .
+    cp "${E2R_ROOT_DIR}/common/Framework_TeeTree.hpp" .
     cp "${E2R_ROOT_DIR}/common/Schema_Events.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_LinkDef.h" .
+    cp "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
     cp "${E2R_ROOT_DIR}/common/POD_Event.hpp" .
     cp "${E2R_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
     cp "${E2R_ROOT_DIR}/common/POD_McParticle.hpp" .
     cp "${E2R_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
     cp "${E2R_ROOT_DIR}/common/POD_Track.hpp" .
-    cp "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
 
     analysis_options="("
     analysis_options+="\"${MODE}\","
