@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # environment
-if [[ -z ${E2R_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2R_ROOT_DIR" ; exit 1; fi
+if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR" ; exit 1; fi
 if [[ -z ${GRID_HOME_DIR:-} ]]; then echo "error: missing env. var. GRID_HOME_DIR" ; exit 1; fi
 
 # command-line arguments
@@ -25,8 +25,8 @@ current_dir=${PWD}
 
 arr_custom_xml=("")
 if [[ ${MODE} == "grid" && ${PRODUCTION_NAME} =~ LHC1* ]]; then # data real?
-    cd "${E2R_ROOT_DIR}"
-    xml_rn_dir=xml/${PRODUCTION_NAME}/${RUN_NUMBER} # relative to E2R_ROOT_DIR
+    cd "${E2T_ROOT_DIR}"
+    xml_rn_dir=xml/${PRODUCTION_NAME}/${RUN_NUMBER} # relative to E2T_ROOT_DIR
     if [[ -d ${xml_rn_dir} ]]; then # run number big?
         mapfile -t arr_custom_xml < <(find "${xml_rn_dir}" -name "*.xml")
     fi
@@ -42,7 +42,7 @@ for index in "${!arr_custom_xml[@]}"; do
         attempt_suffix="_$((index + 1))"
     fi
 
-    attempt_dir=${E2R_ROOT_DIR}/task/attempts/${ATTEMPT_NAME}_${RUN_NUMBER}${attempt_suffix}
+    attempt_dir=${E2T_ROOT_DIR}/task/attempts/${ATTEMPT_NAME}_${RUN_NUMBER}${attempt_suffix}
     mkdir -p "${attempt_dir}"
 
     echo "exec.sh ::   >> GRID_CUSTOM_XML   = \"${custom_xml}\""
@@ -51,20 +51,20 @@ for index in "${!arr_custom_xml[@]}"; do
     cd "${attempt_dir}"
 
     # copy task files
-    cp "${E2R_ROOT_DIR}/task/RunTask.C" .
-    cp "${E2R_ROOT_DIR}/task/AddTaskEsd2Vector.C" .
-    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.cxx" .
-    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector.h" .
-    cp "${E2R_ROOT_DIR}/task/AliTaskEsd2Vector_LinkDef.h" .
-    cp "${E2R_ROOT_DIR}/common/Constants.hpp" .
-    cp "${E2R_ROOT_DIR}/common/Framework_TeeTree.hpp" .
-    cp "${E2R_ROOT_DIR}/common/Schema_Events.hpp" .
-    cp "${E2R_ROOT_DIR}/common/E2R_Cuts.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_Event.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_McParticle.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
-    cp "${E2R_ROOT_DIR}/common/POD_Track.hpp" .
+    cp "${E2T_ROOT_DIR}/task/RunTask.C" .
+    cp "${E2T_ROOT_DIR}/task/AddTaskEsd2Tree.C" .
+    cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.cxx" .
+    cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.h" .
+    cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree_LinkDef.h" .
+    cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Schema_Events.hpp" .
+    cp "${E2T_ROOT_DIR}/common/E2T_Cuts.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .
 
     analysis_options="("
     analysis_options+="\"${MODE}\","

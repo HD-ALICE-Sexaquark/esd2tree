@@ -20,8 +20,8 @@ print_usage() { echo "usage: ./mc_task_wrapper.sh [LHC23l1a3,LHC23l1b3,LHC26h]";
 
 # check environment
 if [[ -z ${LOCAL_SIMS_DIR:-} ]]; then echo "error: missing env. var. LOCAL_SIMS_DIR"; exit 1; fi
-if [[ -z ${E2R_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2R_ROOT_DIR"; exit 1; fi
-mkdir -p "${E2R_ROOT_DIR}/slurm"
+if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
+mkdir -p "${E2T_ROOT_DIR}/slurm"
 
 # command-line arguments
 if [[ $# -ne 1 ]]; then print_usage; exit 1; fi
@@ -58,11 +58,11 @@ fi
 n_total_jobs=$(echo "${RUN_NUMBERS_STR}" | wc -w)
 array_max=$((n_total_jobs - 1))
 
-mkdir -p "${E2R_ROOT_DIR}/slurm/tmp"
+mkdir -p "${E2T_ROOT_DIR}/slurm/tmp"
 
 sbatch \
-    --output="${E2R_ROOT_DIR}/slurm/tmp/%A_%a.log" \
+    --output="${E2T_ROOT_DIR}/slurm/tmp/%A_%a.log" \
     --array="0-${array_max}%${MAX_PARALLEL_JOBS}" \
-    -- "${E2R_ROOT_DIR}/scripts/farm-pi/mc_task_exec.sh"
+    -- "${E2T_ROOT_DIR}/scripts/farm-pi/mc_task_exec.sh"
 
 echo "$0 @ ${HOSTNAME} :: a total of ${n_total_jobs} jobs have been submitted"

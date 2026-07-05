@@ -14,7 +14,7 @@
 #include <AliMultSelectionTask.h>
 #include <AliPhysicsSelectionTask.h>
 
-#include "AliTaskEsd2Vector.h"
+#include "AliTaskEsd2Tree.h"
 
 void RunTask(const char *Mode,            // "local", "grid"
              const char *InputPath,       // what comes before the RN
@@ -57,7 +57,7 @@ void RunTask(const char *Mode,            // "local", "grid"
     gInterpreter->ProcessLine(".include ${ALICE_ROOT}/include");
     gInterpreter->ProcessLine(".include ${ALICE_PHYSICS}/include");
 
-    AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Vector");
+    AliAnalysisManager *mgr = new AliAnalysisManager("Esd2Tree");
 
     std::cout << "INFO  !! RunTask.C !! Created AliAnalysisManager" << '\n';
 
@@ -71,8 +71,8 @@ void RunTask(const char *Mode,            // "local", "grid"
         alienHandler->SetExecutableCommand("aliroot -l -b -q -x");
         alienHandler->AddIncludePath("-I. -I${ROOTSYS}/include -I${ALICE_ROOT} -I${ALICE_ROOT}/include -I${ALICE_PHYSICS}/include");
         alienHandler->SetAdditionalLibs(
-            "AliTaskEsd2Vector.cxx AliTaskEsd2Vector.h AliTaskEsd2Vector_LinkDef.h Constants.hpp Framework_TeeTree.hpp Schema_Events.hpp "
-            "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp E2R_Cuts.hpp");
+            "AliTaskEsd2Tree.cxx AliTaskEsd2Tree.h AliTaskEsd2Tree_LinkDef.h Constants.hpp Framework_TeeTree.hpp Schema_Events.hpp "
+            "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp E2T_Cuts.hpp");
         alienHandler->SetTTL(TimeToLive);
         alienHandler->SetDefaultOutputs(false);
         alienHandler->SetOutputFiles("AnalysisResults.root");
@@ -80,9 +80,9 @@ void RunTask(const char *Mode,            // "local", "grid"
         alienHandler->SetKeepLogs(true);
         alienHandler->SetMergeViaJDL(false);
         alienHandler->SetGridWorkingDir(Grid_WorkingDir);
-        alienHandler->SetAnalysisSource("AliTaskEsd2Vector.cxx");
-        alienHandler->SetJDLName("TaskEsd2Vector.jdl");
-        alienHandler->SetExecutable("TaskEsd2Vector.sh");
+        alienHandler->SetAnalysisSource("AliTaskEsd2Tree.cxx");
+        alienHandler->SetJDLName("TaskEsd2Tree.jdl");
+        alienHandler->SetExecutable("TaskEsd2Tree.sh");
         alienHandler->SetAliPhysicsVersion("vAN-20260616_O2-1");  // see latest available in https://alimonitor.cern.ch/packages/
 
         alienHandler->SetOutputToRunNo(1);  // output-subdir will inherit xml's filename
@@ -174,12 +174,12 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     // # Add Main Task # //
 
-    gInterpreter->LoadMacro("AliTaskEsd2Vector.cxx++g");
+    gInterpreter->LoadMacro("AliTaskEsd2Tree.cxx++g");
 
-    TString TaskEsd2Vector_Options = Form("(%i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC);
-    AliTaskEsd2Vector *TaskEsd2Vector = reinterpret_cast<AliTaskEsd2Vector *>(  //
-        gInterpreter->ExecuteMacro("AddTaskEsd2Vector.C" + TaskEsd2Vector_Options));
-    if (TaskEsd2Vector == nullptr) return;
+    TString TaskEsd2Tree_Options = Form("(%i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC);
+    AliTaskEsd2Tree *TaskEsd2Tree = reinterpret_cast<AliTaskEsd2Tree *>(  //
+        gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
+    if (TaskEsd2Tree == nullptr) return;
 
     std::cout << "INFO  !! RunTask.C !! Passed addition of main task" << '\n';
 

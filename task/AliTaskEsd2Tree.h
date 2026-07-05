@@ -13,7 +13,7 @@
 #include "Framework_TeeTree.hpp"
 #include "Schema_Events.hpp"
 
-#include "AliTaskEsd2Vector_LinkDef.h"
+#include "AliTaskEsd2Tree_LinkDef.h"
 
 class TClass;
 class TBits;
@@ -32,7 +32,7 @@ class AliMCEvent;
 class AliVVertex;
 class AliPIDResponse;
 
-class AliTaskEsd2Vector : public AliAnalysisTaskSE {
+class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
     enum ETrack {
         kAllTracks,
@@ -64,9 +64,9 @@ class AliTaskEsd2Vector : public AliAnalysisTaskSE {
     };
 
    public:
-    AliTaskEsd2Vector(const char* name);
-    AliTaskEsd2Vector();
-    ~AliTaskEsd2Vector();
+    AliTaskEsd2Tree(const char* name);
+    AliTaskEsd2Tree();
+    ~AliTaskEsd2Tree();
 
     // Settings ~ stored in Analysis Manager //
     void Initialize(bool is_mc, bool is_sexa_mc = false, bool is_hdib_mc = false);
@@ -123,13 +123,13 @@ class AliTaskEsd2Vector : public AliAnalysisTaskSE {
     // Signal Logs //
     TString fAliEnPath;                                                                                         //! loaded in `UserNotify()`
     TString fSignalLog_NewBasename;                                                                             //!
-    std::array<std::array<int, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Sexaquark_Pz;  //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Px;    //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Py;    //!
-    std::array<std::array<float, E2R::NSexaReactionsPerEvent>, E2R::NEventsInDedicatedMC> fEvVec_Nucleon_Pz;    //!
+    std::array<std::array<int, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Pz;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Px;    //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Py;    //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Pz;    //!
 
     // Output //
 
@@ -145,5 +145,5 @@ class AliTaskEsd2Vector : public AliAnalysisTaskSE {
     Schema::Events fOutput;                               //!
     std::unique_ptr<Framework::TeeTree::Writer> fWriter;  //!
 
-    ClassDef(AliTaskEsd2Vector, 2);
+    ClassDef(AliTaskEsd2Tree, 2);
 };
