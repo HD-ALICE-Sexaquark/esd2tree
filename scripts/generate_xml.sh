@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-if [[ -z ${E2R_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2R_ROOT_DIR"; exit 1; fi
+if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 if [[ $# -ne 1 ]]; then echo "usage: ./generate_xml.sh <rn_file>"; exit 1; fi
 
 rn_file=$1
@@ -31,7 +31,7 @@ while read -r rn; do
     n_total_files=$(alien.py find -c "${prod_path}/000${rn}/${pass_subdir}" "*/AliESDs.root" | tail -1 | awk '{print $2}')
     if [[ ${n_total_files} -le ${max_total_files} ]]; then continue; fi
 
-    xml_rn_dir="${E2R_ROOT_DIR}/xml/$(basename "${prod_path}")/${rn}"
+    xml_rn_dir="${E2T_ROOT_DIR}/xml/$(basename "${prod_path}")/${rn}"
     mkdir -p "${xml_rn_dir}"
 
     n_divisions=$((n_total_files / delta))

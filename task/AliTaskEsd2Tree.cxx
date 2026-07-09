@@ -465,8 +465,8 @@ void AliTaskEsd2Tree::ProcessTracks() {
         new_track.Pz = static_cast<float>(momentum[2]);
         new_track.Charge = esd_track->Charge();
         // -- dca
-        new_track.PreDCAxy = pre_dca[0];
-        new_track.PreDCAz = pre_dca[1];
+        new_track.PreDCAxy = std::abs(pre_dca[0]);
+        new_track.PreDCAz = std::abs(pre_dca[1]);
         // -- pid; for RD, it includes corrections; for MC, this is the correct way
         new_track.TPC_Signal = fIsMC ? static_cast<float>(esd_track->GetTPCsignalTunedOnData()) : static_cast<float>(esd_track->GetTPCsignal());
         new_track.NSigmasPion = n_sigmas_pi;
@@ -636,8 +636,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
             new_lambda.Neg_CovMatrix[idx_cov] = static_cast<float>(neg_cov_xyz_pxpypz[idx_cov]);
         }
-        new_lambda.Neg_PreDCAxy = neg_dca[0];
-        new_lambda.Neg_PreDCAz = neg_dca[1];
+        new_lambda.Neg_PreDCAxy = std::abs(neg_dca[0]);
+        new_lambda.Neg_PreDCAz = std::abs(neg_dca[1]);
         new_lambda.Neg_NSigmasProton = neg_n_sigmas_proton;
         new_lambda.Neg_NSigmasKaon = neg_n_sigmas_kaon;
         new_lambda.Neg_NSigmasPion = neg_n_sigmas_pion;
@@ -652,8 +652,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
             new_lambda.Pos_CovMatrix[idx_cov] = static_cast<float>(pos_cov_xyz_pxpypz[idx_cov]);
         }
-        new_lambda.Pos_PreDCAxy = pos_dca[0];
-        new_lambda.Pos_PreDCAz = pos_dca[1];
+        new_lambda.Pos_PreDCAxy = std::abs(pos_dca[0]);
+        new_lambda.Pos_PreDCAz = std::abs(pos_dca[1]);
         new_lambda.Pos_NSigmasProton = pos_n_sigmas_proton;
         new_lambda.Pos_NSigmasKaon = pos_n_sigmas_kaon;
         new_lambda.Pos_NSigmasPion = pos_n_sigmas_pion;

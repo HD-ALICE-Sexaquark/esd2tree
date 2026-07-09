@@ -9,7 +9,7 @@ set -euo pipefail
 # hardcoded options #
 
 export MODE="local"
-export LOCAL_N_DIRS=6
+export LOCAL_N_DIRS=6 # gets overriden
 MAX_PARALLEL_JOBS=60
 reaction_channels=("A") # "A" "D" "H"
 injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
@@ -28,7 +28,10 @@ if [[ $# -ne 1 ]]; then print_usage; exit 1; fi
 export PRODUCTION_NAME="$1"
 
 # validate input args
-if [[ "$1" != "LHC23l1a3" && "$1" != "LHC23l1b3" && "$1" != "LHC26h" ]]; then print_usage; exit 1; fi
+if [[ "${PRODUCTION_NAME}" != "LHC23l1a3" && "${PRODUCTION_NAME}" != "LHC23l1b3" && "${PRODUCTION_NAME}" != "LHC26h" ]]; then print_usage; exit 1; fi
+if [[ "${PRODUCTION_NAME}" == "LHC26h" ]]; then
+    LOCAL_N_DIRS=50
+fi
 
 # define strings (NOTE: not arrays, because Slurm)
 export CHANNELS_STR=""
