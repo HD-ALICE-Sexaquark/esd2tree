@@ -8,7 +8,6 @@ AliTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_sexa_mc, bool is_hdib_mc) {
     if (mgr == nullptr) return nullptr;
 
     auto *task = new AliTaskEsd2Tree("AliTaskEsd2Tree");
-    if (task == nullptr) return nullptr;
 
     // NOTE: `SelectCollisionCandidates` omitted because it's done within the task's `PassesEventSelection`
     task->Initialize(is_mc, is_sexa_mc, is_hdib_mc);

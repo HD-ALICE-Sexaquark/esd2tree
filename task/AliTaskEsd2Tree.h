@@ -8,6 +8,7 @@
 #include <AliAnalysisTaskSE.h>
 #include <AliESDtrack.h>
 #include <AliEventCuts.h>
+#include <AliMCParticle.h>
 
 #include "Constants.hpp"
 #include "Framework_TeeTree.hpp"
@@ -34,7 +35,7 @@ class AliPIDResponse;
 
 class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
-    enum ETrack {
+    enum ETrack {  // PENDING to sort when cuts defined
         kAllTracks,
         kValidStatusTPC_1,
         kValidStatusTPC_2,
@@ -55,17 +56,22 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     enum EPreFoundLambda {
         kAllPreFoundV0s,
         kOnTheFlyV0s,
+        kPassesDcaV0Daughters,
+        kPassesPtCuts,
+        kPassesMinDecayRadius2D,
+        kPassesDCAwrtPV,
         kNegDaughterHasValidPid,
         kPosDaughterHasValidPid,
         kPassesPid,
+        kPassesMinPtPion,
         kPassesInvariantMass,
         kPassesArmenterosPodolanski,
         kNPreFoundLambdaCuts,
     };
 
    public:
-    AliTaskEsd2Tree(const char* name);
     AliTaskEsd2Tree();
+    AliTaskEsd2Tree(const char* name);
     ~AliTaskEsd2Tree();
 
     // Settings ~ stored in Analysis Manager //
@@ -91,10 +97,22 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
     // Injected Reactions //
     void ProcessInjectedReactions();
-    void BringSignalLogs();
-    bool ReadSignalLogs();
+    bool ReadSignalLogs(const TString& sim_sub_set);
 
     // Utilities //
+    Common::ECustomGeneratorIdx GetCustomGeneratorIndex(const AliMCParticle* mc) const {
+        short orig_gen_idx = mc->GetGeneratorIndex();
+        if (fIsMC_DedicatedSexaquark) {
+            return static_cast<Common::ECustomGeneratorIdx>(orig_gen_idx);
+        }
+        if (fIsMC_DedicatedHdibaryon) {
+            if (orig_gen_idx < 6)
+                return Common::ECustomGeneratorIdx::kInjectedAuxCharged;
+            else
+                return Common::ECustomGeneratorIdx::kInjectedHdibaryon;
+        }
+        return Common::kHijing;  // valid for general-purpose MC
+    }
     static int GetFirstRow(const TBits& map) {
         int firstRow = -1;  // default value
         for (int i = 0; i < 159; ++i) {
@@ -122,7 +140,6 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
     // Signal Logs //
     TString fAliEnPath;                                                                                         //! loaded in `UserNotify()`
-    TString fSignalLog_NewBasename;                                                                             //!
     std::array<std::array<int, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
     std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
     std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!

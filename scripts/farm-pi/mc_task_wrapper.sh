@@ -1,10 +1,9 @@
 #!/bin/bash
 
-# `esd2vector/scripts/farm-pi/mc_task_wrapper.sh`
-# ==============================================
-# Send MC jobs to the Slurm farm.
+# `esd2vector/scripts/farm-pi/mc_task_wrapper.sh` -- Send MC jobs to the Slurm farm.
 
 set -euo pipefail
+shopt -s nullglob
 
 # hardcoded options #
 
@@ -14,18 +13,21 @@ MAX_PARALLEL_JOBS=60
 reaction_channels=("A") # "A" "D" "H"
 injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
 
-# functions #
-
-print_usage() { echo "usage: ./mc_task_wrapper.sh [LHC23l1a3,LHC23l1b3,LHC26h]"; }
+print_usage() {
+    echo "usage: ./mc_task_wrapper.sh <production_name> [max_rn]";
+    echo "       where:";
+    echo "       <production_name> : LHC23l1a3, LHC23l1b3, LHC26h";
+    echo "       [max_rn]          : if 0 = no limit";
+}
 
 # check environment
 if [[ -z ${LOCAL_SIMS_DIR:-} ]]; then echo "error: missing env. var. LOCAL_SIMS_DIR"; exit 1; fi
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
-mkdir -p "${E2T_ROOT_DIR}/slurm"
 
 # command-line arguments
-if [[ $# -ne 1 ]]; then print_usage; exit 1; fi
+if [[ $# -lt 1 || $# -gt 2 ]]; then print_usage; exit 1; fi
 export PRODUCTION_NAME="$1"
+MAX_RN=${2:-0}  # 0 = no limit
 
 # validate input args
 if [[ "${PRODUCTION_NAME}" != "LHC23l1a3" && "${PRODUCTION_NAME}" != "LHC23l1b3" && "${PRODUCTION_NAME}" != "LHC26h" ]]; then print_usage; exit 1; fi
@@ -33,32 +35,48 @@ if [[ "${PRODUCTION_NAME}" == "LHC26h" ]]; then
     LOCAL_N_DIRS=50
 fi
 
-# define strings (NOTE: not arrays, because Slurm)
-export CHANNELS_STR=""
-export MASSES_STR=""
-export RUN_NUMBERS_STR=""
+# array accumulation
+channels=()
+masses=()
+run_numbers=()
 
 input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}
 
 if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then
-    # loop over <input_path>/<r_channel><s_mass>/<rn_dir>
     for r_channel in "${reaction_channels[@]}"; do
         for s_mass in "${injected_masses[@]}"; do
             for rn_dir in "${input_path}/${r_channel}${s_mass}"/*/; do
-                CHANNELS_STR+="${r_channel} "
-                MASSES_STR+="${s_mass} "
-                RUN_NUMBERS_STR+="$(basename "${rn_dir}") "
+                channels+=("${r_channel}")
+                masses+=("${s_mass}")
+                run_numbers+=("$(basename "${rn_dir}")")
             done
         done
     done
 else
-    # loop over <input_path>/<rn_dir>
     for rn_dir in "${input_path}"/signal/*/; do
-        RUN_NUMBERS_STR+="$(basename "${rn_dir}") "
+        run_numbers+=("$(basename "${rn_dir}")")
     done
 fi
 
-n_total_jobs=$(echo "${RUN_NUMBERS_STR}" | wc -w)
+# truncate run number jobs
+if (( MAX_RN > 0 && ${#run_numbers[@]} > MAX_RN )); then
+    run_numbers=("${run_numbers[@]:0:MAX_RN}")
+    if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then
+        channels=("${channels[@]:0:MAX_RN}")
+        masses=("${masses[@]:0:MAX_RN}")
+    fi
+fi
+
+# join arrays into strings before exporting, because Slurm
+export CHANNELS_STR="${channels[*]}"
+export MASSES_STR="${masses[*]}"
+export RUN_NUMBERS_STR="${run_numbers[*]}"
+
+n_total_jobs=${#run_numbers[@]}
+if (( n_total_jobs == 0 )); then
+    echo "error: no run number directories found under ${input_path}"
+    exit 1
+fi
 array_max=$((n_total_jobs - 1))
 
 mkdir -p "${E2T_ROOT_DIR}/slurm/tmp"

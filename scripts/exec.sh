@@ -24,7 +24,7 @@ echo "exec.sh ::   ATTEMPT_NAME         = ${ATTEMPT_NAME}"
 current_dir=${PWD}
 
 arr_custom_xml=("")
-if [[ ${MODE} == "grid" && ${PRODUCTION_NAME} =~ LHC1* ]]; then # data real?
+if [[ ${MODE} == "grid" && ${PRODUCTION_NAME} =~ ^LHC1 ]]; then # data real?
     cd "${E2T_ROOT_DIR}"
     xml_rn_dir=xml/${PRODUCTION_NAME}/${RUN_NUMBER} # relative to E2T_ROOT_DIR
     if [[ -d ${xml_rn_dir} ]]; then # run number big?
@@ -52,19 +52,26 @@ for index in "${!arr_custom_xml[@]}"; do
 
     # copy task files
     cp "${E2T_ROOT_DIR}/task/RunTask.C" .
-    cp "${E2T_ROOT_DIR}/task/AddTaskEsd2Tree.C" .
-    cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.cxx" .
+    cp "${E2T_ROOT_DIR}/task/E2T_Cuts.h" .
     cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.h" .
+    cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.cxx" .
     cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree_LinkDef.h" .
-    cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
-    cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
+    cp "${E2T_ROOT_DIR}/task/AddTaskEsd2Tree.C" .
     cp "${E2T_ROOT_DIR}/common/Schema_Events.hpp" .
-    cp "${E2T_ROOT_DIR}/common/E2T_Cuts.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
     cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Math.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
+
+    cp "${E2T_ROOT_DIR}/tidentity/macros/AddTask_marsland_TIdentityPID.C" .
+    cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.cxx" .
+    cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.h" .
+    cp "${E2T_ROOT_DIR}/tidentity/macros/Config_marsland_TIdentityPID.C" .
+    cp "${E2T_ROOT_DIR}/tidentity/macros/AddTaskFilteredTreeLocal.C" .
 
     analysis_options="("
     analysis_options+="\"${MODE}\","
@@ -73,6 +80,7 @@ for index in "${!arr_custom_xml[@]}"; do
     analysis_options+="${RUN_NUMBER},"
     analysis_options+="${LOCAL_N_DIRS},"
     analysis_options+="${LOCAL_LIMIT_N_EVENTS},"
+    analysis_options+="true,"
     analysis_options+="\"${GRID_WORKING_DIR}\","
     analysis_options+="\"${custom_xml}\""
     analysis_options+=")"

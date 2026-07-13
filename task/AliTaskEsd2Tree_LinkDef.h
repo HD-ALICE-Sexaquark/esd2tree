@@ -4,6 +4,7 @@
 #pragma link off all functions;
 
 // clang-format off
+#pragma link C++ class  AliTaskEsd2Tree+;
 #pragma link C++ struct POD::Event+;
 #pragma link C++ struct POD::MC::Event+;
 #pragma link C++ struct POD::Track+;
@@ -14,6 +15,5 @@
 #pragma link C++ class  std::vector<POD::InjectedSexa>+;
 #pragma link C++ struct POD::McParticle+;
 #pragma link C++ class  std::vector<POD::McParticle>+;
-#pragma link C++ class  std::vector<unsigned int>+;
 // clang-format on
 #endif
