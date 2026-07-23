@@ -45,7 +45,9 @@ run_number=${RUN_NUMBERS_ARR[${SLURM_ARRAY_TASK_ID}]}
 
 # prepare output dirs
 red_prod_name=${PRODUCTION_NAME/LHC/} # remove 'LHC'
-simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${red_prod_name}/${reaction_channel}${injected_mass}
+simset_suffix=""
+if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then simset_suffix="_${reaction_channel}${injected_mass}"; fi
+simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${red_prod_name}${simset_suffix}
 rn_outdir=${simset_outdir}/${run_number}
 mkdir -p "${rn_outdir}"
 
@@ -53,7 +55,6 @@ cd "${rn_outdir}"
 
 # copy task files
 cp "${E2T_ROOT_DIR}/task/RunTask.C" .
-cp "${E2T_ROOT_DIR}/task/E2T_Cuts.h" .
 cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.h" .
 cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.cxx" .
 cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree_LinkDef.h" .
@@ -66,6 +67,7 @@ cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
 cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
 cp "${E2T_ROOT_DIR}/common/Math.hpp" .
 cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
+cp "${E2T_ROOT_DIR}/common/Cuts_E2T.hpp" .
 cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
 
 cp "${E2T_ROOT_DIR}/tidentity/macros/AddTask_marsland_TIdentityPID.C" .

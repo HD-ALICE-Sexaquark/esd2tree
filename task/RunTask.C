@@ -85,7 +85,7 @@ void RunTask(const char *Mode,            // "local", "grid"
         alienHandler->AddIncludePath("-I. -I${ROOTSYS}/include -I${ALICE_ROOT} -I${ALICE_ROOT}/include -I${ALICE_PHYSICS}/include");
         TString additional_libs =
             "AliTaskEsd2Tree.cxx AliTaskEsd2Tree.h AliTaskEsd2Tree_LinkDef.h Constants.hpp Framework_TeeTree.hpp Schema_Events.hpp "
-            "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp E2T_Cuts.h Math.hpp";
+            "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp Cuts_E2T.hpp Math.hpp";
         if (include_tidentity) {
             additional_libs +=
                 " AddTask_marsland_TIdentityPID.C AliAnalysisTaskTIdentityPID.cxx AliAnalysisTaskTIdentityPID.h Config_marsland_TIdentityPID.C "

@@ -1,0 +1,7 @@
+#SCRON --job-name=e2t_dl_rd
+#SCRON --export=ALL
+#SCRON --singularity-container=
+#SCRON --output=${E2T_ROOT_DIR}/scripts/scrontab-logs/downloader_rd.log
+#SCRON --open-mode=append
+#SCRON --time=02:00:00
+*/10 * * * * ${E2T_ROOT_DIR}/scripts/scrontab-gsi/downloader.sh rd

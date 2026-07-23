@@ -8,10 +8,11 @@ shopt -s nullglob
 # hardcoded options #
 
 export MODE="local"
-export LOCAL_N_DIRS=6 # gets overriden
-MAX_PARALLEL_JOBS=60
-reaction_channels=("A") # "A" "D" "H"
-injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
+export LOCAL_N_DIRS=6 # gets overriden for 26h
+MAX_PARALLEL_JOBS=45
+# reaction_channels=("A") # "A" "D" "H"
+# injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
+rmasses_pairs=("A1.73" "A2.01" "D1.8" "H1.8")
 
 print_usage() {
     echo "usage: ./mc_task_wrapper.sh <production_name> [max_rn]";
@@ -43,14 +44,16 @@ run_numbers=()
 input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}
 
 if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then
-    for r_channel in "${reaction_channels[@]}"; do
-        for s_mass in "${injected_masses[@]}"; do
-            for rn_dir in "${input_path}/${r_channel}${s_mass}"/*/; do
-                channels+=("${r_channel}")
-                masses+=("${s_mass}")
-                run_numbers+=("$(basename "${rn_dir}")")
-            done
+    for r_pair in "${rmasses_pairs[@]}"; do
+    # for r_channel in "${reaction_channels[@]}"; do
+    # for s_mass in "${injected_masses[@]}"; do
+        for rn_dir in "${input_path}/${r_pair}"/*/; do
+            channels+=("${r_pair:0:1}")
+            masses+=("${r_pair:1:4}")
+            run_numbers+=("$(basename "${rn_dir}")")
         done
+    # done
+    # done
     done
 else
     for rn_dir in "${input_path}"/signal/*/; do

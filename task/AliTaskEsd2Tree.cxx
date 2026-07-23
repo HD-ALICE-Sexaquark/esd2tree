@@ -28,7 +28,7 @@
 #include <AliMultSelection.h>
 
 #include "Constants.hpp"
-#include "E2T_Cuts.h"
+#include "Cuts_E2T.hpp"
 #include "Math.hpp"
 
 #include "AliTaskEsd2Tree.h"
@@ -171,13 +171,16 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     x_axis->SetBinLabel(EPreFoundLambda::kAllPreFoundV0s + 1, "AllPreFoundV0s");
     x_axis->SetBinLabel(EPreFoundLambda::kOnTheFlyV0s + 1, "OnTheFlyV0s");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesDcaV0Daughters + 1, "PassesDcaV0Daughters");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesPtCuts + 1, "PassesPtCuts");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinPtLambda + 1, "PassesMinPtLambda");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxPtLambda + 1, "PassesMaxPtLambda");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesMinDecayRadius2D + 1, "PassesMinDecayRadius2D");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesDCAwrtPV + 1, "PassesDCAwrtPV");
     x_axis->SetBinLabel(EPreFoundLambda::kNegDaughterHasValidPid + 1, "NegDaughterHasValidPid");
     x_axis->SetBinLabel(EPreFoundLambda::kPosDaughterHasValidPid + 1, "PosDaughterHasValidPid");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesPid + 1, "PassesPid");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinPtPion + 1, "PassesMinPtPion");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinPtDaughters + 1, "PassesMinPtDaughters");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxPtDaughters + 1, "PassesMaxPtDaughters");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesAbsMaxEtaDaughters + 1, "PassesAbsMaxEtaDaughters");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesInvariantMass + 1, "PassesInvariantMass");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesArmenterosPodolanski + 1, "PassesArmenterosPodolanski");
     fOutputList->Add(fHist_PreFoundLambdas_Bookkeeping);
@@ -617,9 +620,10 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesDcaV0Daughters);
 
         // transverse momentum
-        if (v0->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt) continue;  // apply cut
         if (v0->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesPtCuts);
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinPtLambda);
+        if (v0->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMaxPtLambda);
 
         // decay radius 2d
         dv_v0.SetCoordinates(v0->Xv(), v0->Yv(), v0->Zv());
@@ -661,11 +665,20 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         if (!could_be_anti_lambda && !could_be_lambda) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesPid);
 
-        // daughter's pt
-        // NOTE: because proton has a larger min. pt, this cut makes sense on any anti- or nominal- hypothesis
-        if (pos_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Pion) continue;  // apply cut
-        if (neg_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Pion) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinPtPion);
+        // daughter's min pt
+        if (pos_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Daughters) continue;  // apply cut
+        if (neg_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinPtDaughters);
+
+        // daughter's max pt
+        if (pos_track->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt_Daughters) continue;  // apply cut
+        if (neg_track->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMaxPtDaughters);
+
+        // daughter's pseudorapidity
+        if (std::abs(pos_track->Eta()) > E2T::Cuts::PreFoundLambda::AbsMax_Eta_Daughters) continue;  // apply cut
+        if (std::abs(neg_track->Eta()) > E2T::Cuts::PreFoundLambda::AbsMax_Eta_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesAbsMaxEtaDaughters);
 
         // invariant mass
         // -- get daughter's momenta @ pca w.r.t. v0
@@ -722,14 +735,14 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         // -- remaining pid as kaon
         float pos_n_sigmas_kaon = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kKaon);
 
-        // create new //
+        // create new (anti)lambda candidate //
         POD::PreFoundLambda new_lambda;  // non-initialized on purpose
         new_lambda.PreFoundEntry = static_cast<unsigned int>(entry_v0);
         new_lambda.Decay_X = static_cast<float>(v0->Xv());
         new_lambda.Decay_Y = static_cast<float>(v0->Yv());
         new_lambda.Decay_Z = static_cast<float>(v0->Zv());
         new_lambda.DcaV0Daughters = static_cast<float>(v0->GetDcaV0Daughters());
-        // negative daughter
+        // negative daughter //
         new_lambda.Neg_EsdEntry = static_cast<unsigned int>(v0->GetNindex());
         new_lambda.Neg_State = {static_cast<float>(neg_position[0]), static_cast<float>(neg_position[1]), static_cast<float>(neg_position[2]),
                                 static_cast<float>(neg_momentum[0]), static_cast<float>(neg_momentum[1]), static_cast<float>(neg_momentum[2])};
@@ -745,7 +758,13 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_px);
         new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_py);
         new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_pz);
-        // positive daughter
+#if E2T_TPC_EXTRA
+        new_lambda.Neg_TPC_Chi2 = static_cast<float>(neg_track->GetTPCchi2());
+        new_lambda.Neg_TPC_NCrossedRows = neg_track->GetTPCCrossedRows();
+        new_lambda.Neg_TPC_NClusters = neg_track->GetTPCNcls();
+        new_lambda.Neg_TPC_NClustersFindable = neg_track->GetTPCNclsF();
+#endif
+        // positive daughter //
         new_lambda.Pos_EsdEntry = static_cast<unsigned int>(v0->GetPindex());
         new_lambda.Pos_State = {static_cast<float>(pos_position[0]), static_cast<float>(pos_position[1]), static_cast<float>(pos_position[2]),
                                 static_cast<float>(pos_momentum[0]), static_cast<float>(pos_momentum[1]), static_cast<float>(pos_momentum[2])};
@@ -761,6 +780,12 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_px);
         new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_py);
         new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_pz);
+#if E2T_TPC_EXTRA
+        new_lambda.Pos_TPC_Chi2 = static_cast<float>(pos_track->GetTPCchi2());
+        new_lambda.Pos_TPC_NCrossedRows = pos_track->GetTPCCrossedRows();
+        new_lambda.Pos_TPC_NClusters = pos_track->GetTPCNcls();
+        new_lambda.Pos_TPC_NClustersFindable = pos_track->GetTPCNclsF();
+#endif
 
         // push reconstructed //
         fOutput.PreFoundLambda.emplace_back(new_lambda);
@@ -777,7 +802,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
 
 // Store the in-memory values into the tree branches.
 void AliTaskEsd2Tree::ProcessInjectedReactions() {
-    if (fOutput.Event.EventNumber >= E2T::NEventsInDedicatedMC) {
+    if (fOutput.Event.EventNumber >= E2T::NEventsInDedicatedMCFile) {
         AliWarning("Invalid EventNumber to read signal logs.");
         return;
     }
@@ -854,7 +879,7 @@ bool AliTaskEsd2Tree::ReadSignalLogs(const TString &sim_sub_set) {
         // -- small protection
         if (event_n < 0) continue;
         if (line.rfind(E2T::SimLog_ReactionMarker, 0) != 0) continue;
-        if (event_n >= static_cast<int>(E2T::NEventsInDedicatedMC) || react_id >= static_cast<int>(E2T::NSexaReactionsPerEvent)) {
+        if (event_n >= static_cast<int>(E2T::NEventsInDedicatedMCFile) || react_id >= static_cast<int>(E2T::NSexaReactionsPerEvent)) {
             AliWarningF("sim.log exceeds expected events/reactions (event %i, reaction %i), skipping", event_n, react_id);
             continue;
         }

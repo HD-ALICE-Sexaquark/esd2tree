@@ -1,0 +1,7 @@
+#SCRON --job-name=e2t_cl_rd
+#SCRON --export=ALL
+#SCRON --singularity-container=
+#SCRON --output=${E2T_ROOT_DIR}/scripts/scrontab-logs/cleaner_rd.log
+#SCRON --open-mode=append
+#SCRON --time=01:00:00
+*/30 * * * * ${E2T_ROOT_DIR}/scripts/scrontab-gsi/cleaner.sh rd

@@ -1,0 +1,7 @@
+#SCRON --job-name=e2t_sub_mc
+#SCRON --export=ALL
+#SCRON --singularity-container=
+#SCRON --output=${E2T_ROOT_DIR}/scripts/scrontab-logs/submitter_mc.log
+#SCRON --open-mode=append
+#SCRON --time=02:00:00
+*/20 * * * * ${E2T_ROOT_DIR}/scripts/scrontab-gsi/submitter.sh mc

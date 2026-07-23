@@ -57,13 +57,16 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
         kAllPreFoundV0s,
         kOnTheFlyV0s,
         kPassesDcaV0Daughters,
-        kPassesPtCuts,
+        kPassesMinPtLambda,
+        kPassesMaxPtLambda,
         kPassesMinDecayRadius2D,
         kPassesDCAwrtPV,
         kNegDaughterHasValidPid,
         kPosDaughterHasValidPid,
         kPassesPid,
-        kPassesMinPtPion,
+        kPassesMinPtDaughters,
+        kPassesMaxPtDaughters,
+        kPassesAbsMaxEtaDaughters,
         kPassesInvariantMass,
         kPassesArmenterosPodolanski,
         kNPreFoundLambdaCuts,
@@ -139,14 +142,14 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     AliEventCuts fEventCuts;              //! event cuts
 
     // Signal Logs //
-    TString fAliEnPath;                                                                                         //! loaded in `UserNotify()`
-    std::array<std::array<int, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_ReactionID;      //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Px;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Py;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Sexaquark_Pz;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Px;    //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Py;    //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMC> fEvVec_Nucleon_Pz;    //!
+    TString fAliEnPath;                                                                                             //! loaded in `UserNotify()`
+    std::array<std::array<int, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_ReactionID;      //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Px;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Py;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Pz;  //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Px;    //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Py;    //!
+    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Pz;    //!
 
     // Output //
 
