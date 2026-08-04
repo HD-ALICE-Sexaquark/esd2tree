@@ -39,11 +39,13 @@ void RunTask(const char *Mode,            // "local", "grid"
              long long Local_LimitToNEvents = 0,  // 0 means all events
              /* only valid when "grid" */
              bool include_tidentity = false,    //
-             const char *Grid_WorkingDir = "",  // customize output  dirs, relative to GRID's home dir
+             const char *Grid_WorkingDir = "",  // customize output dirs, relative to GRID's home dir
              const char *Grid_CustomXML = ""    // if not empty, get input files from custom XML instead of automatically generating one
 ) {
 
     // # Derive Options # //
+
+    bool IsGridMode = TString(Mode) == "grid";
 
     auto ProductionName_TStr = TString(ProductionName);
     bool IsMC = ProductionName_TStr.Contains("LHC2");  // fragile MC detection, but Run 2 finished in 2018
@@ -78,7 +80,7 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     AliAnalysisAlien *alienHandler = nullptr;
 
-    if (TString(Mode) == "grid") {
+    if (IsGridMode) {
         alienHandler = new AliAnalysisAlien();
         alienHandler->SetCheckCopy(false);
         alienHandler->SetExecutableCommand("aliroot -l -b -q -x");
@@ -98,23 +100,35 @@ void RunTask(const char *Mode,            // "local", "grid"
         alienHandler->SetOutputArchive("");
         alienHandler->SetKeepLogs(true);
         alienHandler->SetMergeViaJDL(false);
-        alienHandler->SetGridWorkingDir(Grid_WorkingDir);
         alienHandler->SetAnalysisSource("AliTaskEsd2Tree.cxx");
         alienHandler->SetJDLName("TaskEsd2Tree.jdl");
         alienHandler->SetExecutable("TaskEsd2Tree.sh");
         alienHandler->SetAliPhysicsVersion("vAN-20260616_O2-1");  // see latest available in https://alimonitor.cern.ch/packages/
 
-        alienHandler->SetOutputToRunNo(1);  // output-subdir will inherit xml's filename
+        TString job_tag;
+        if (!AutomaticSearchESDs) {
+            job_tag = gSystem->BaseName(Grid_CustomXML);  // xml files are already named <run>_<index>.xml
+            job_tag.ReplaceAll(".xml", "");
+        } else if (IsMC) {
+            // InputPath ends with the sim set, e.g. /alice/sim/2023/LHC23l1a3/A1.73 -> "A1.73_296690"
+            job_tag = Form("%s_%i", gSystem->BaseName(InputPath), RunNumber);
+        } else {
+            job_tag = Form("%i", RunNumber);
+            if (IsMC) job_tag += Form("_%s", gSystem->BaseName(InputPath));  // InputPath ends with the sim set, e.g. A1.73
+        }
+        alienHandler->SetJobTag(job_tag);
+        alienHandler->SetGridWorkingDir(Grid_WorkingDir);
+        alienHandler->SetGridOutputDir(job_tag);  // no leading '/': relative to the working dir
+        alienHandler->SetOutputToRunNo(0);
+
         if (AutomaticSearchESDs) {
-            if (!IsMC) alienHandler->SetRunPrefix("000");
-            alienHandler->AddRunNumber(RunNumber);
-            alienHandler->SetGridDataDir(InputPath);
+            alienHandler->SetGridDataDir(Form("%s/%s%i", InputPath, IsMC ? "" : "000", RunNumber));
             alienHandler->SetDataPattern(GridDataPattern);
         } else {
             alienHandler->AddDataFile(Grid_CustomXML);
         }
         alienHandler->SetSplitMaxInputFileNumber(SplitMaxNFiles);
-        alienHandler->SetRunMode("full");  // PENDING
+        alienHandler->SetRunMode("full");
 
         mgr->SetGridHandler(alienHandler);
 
@@ -153,7 +167,7 @@ void RunTask(const char *Mode,            // "local", "grid"
     // Reference:
     // Janik's latest train config: http://alitrain.cern.ch/train-workdir/PWGLF/LF_PbPb/1771_20220407-1015/config/MLTrainDefinition.cfg
     TaskCentrality->SetAddInfo(true);
-    TaskCentrality->SetSelectedTriggerClass(AliVEvent::kINT7 | AliVEvent::kCentral | AliVEvent::kSemiCentral);
+    TaskCentrality->SetSelectedTriggerClass(AliVEvent::kMB | AliVEvent::kINT7 | AliVEvent::kCentral | AliVEvent::kSemiCentral);
     if (IsMC) {
         TString AnchoredProdName = "LHC15o";
         if (RunNumber >= 295581 && RunNumber <= 296689) AnchoredProdName = "LHC18q";
@@ -205,9 +219,6 @@ void RunTask(const char *Mode,            // "local", "grid"
     // # Add Ilya's Tasks # //
 
     if (include_tidentity && !IsMC && ProductionName_TStr == "LHC18r") {
-        auto stripped_prod_name = ProductionName_TStr(3, ProductionName_TStr.Length());
-        int prod_year = 2000 + TString(ProductionName_TStr(3, 2)).Atoi();
-
         auto *TaskConfigOCDB = AddTaskConfigOCDB("raw://");
         if (TaskConfigOCDB == nullptr) return;
 
@@ -235,8 +246,7 @@ void RunTask(const char *Mode,            // "local", "grid"
     TChain *chain = nullptr;
     TString FilePath = "";
 
-    if (TString(Mode) == "grid") {
-        // grid mode //
+    if (IsGridMode) {
         // alienHandler->SetNtestFiles(Local_NDirs);  // PENDING
         // alienHandler->SetRunMode("test");          // PENDING
         mgr->StartAnalysis("grid");
@@ -252,12 +262,18 @@ void RunTask(const char *Mode,            // "local", "grid"
         } else {  // data
             TString top_path = Form("%s/000%i/pass%i", InputPath, RunNumber, PassNumber);
             TSystemDirectory top_dir(top_path, top_path);
+            auto *list_of_files = top_dir.GetListOfFiles();
+            if (list_of_files == nullptr) {
+                std::cout << "ERROR !! RunTask.C !! Couldn't list " << top_path << '\n';
+                return;
+            }
             int dir_counter = 0;
-            for (auto *file : *top_dir.GetListOfFiles()) {
+            for (auto *file : *list_of_files) {
                 if (Local_NDirs > 0 && dir_counter == Local_NDirs) break;
+                // NOTE: `GetListOfFiles()` returns plain `TSystemFile`s for regular files, for which this cast yields a nullptr
                 auto *one_dir = dynamic_cast<TSystemDirectory *>(file);
+                if (one_dir == nullptr || !one_dir->IsDirectory()) continue;
                 if (strcmp(one_dir->GetName(), ".") == 0 || strcmp(one_dir->GetName(), "..") == 0) continue;
-                if (!one_dir->IsDirectory()) continue;
                 FilePath = Form("%s/%s/AliESDs.root", top_path.Data(), one_dir->GetName());
                 if (gSystem->AccessPathName(FilePath)) continue;
                 std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';

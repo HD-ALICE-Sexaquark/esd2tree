@@ -4,7 +4,7 @@ set -euo pipefail
 
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR" ; exit 1; fi
-if [[ -z ${GRID_HOME_DIR:-} ]]; then echo "error: missing env. var. GRID_HOME_DIR" ; exit 1; fi
+if [[ -z ${GRID_ABORQUEZ_HOME_DIR:-} ]]; then echo "error: missing env. var. GRID_ABORQUEZ_HOME_DIR" ; exit 1; fi
 
 # command-line arguments
 if [[ $# -ne 1 ]]; then echo "usage: ./exec.sh <config_file>"; exit 1; fi
@@ -35,17 +35,17 @@ fi
 
 for index in "${!arr_custom_xml[@]}"; do
 
-    custom_xml=""
+    grid_custom_xml=""
     attempt_suffix=""
     if [[ ${arr_custom_xml[${index}]} != "" ]];then
-        custom_xml=${GRID_HOME_DIR}/${arr_custom_xml[${index}]} # mirrored at grid
+        grid_custom_xml=${GRID_ABORQUEZ_HOME_DIR}/${arr_custom_xml[${index}]} # mirrored at grid
         attempt_suffix="_$((index + 1))"
     fi
 
     attempt_dir=${E2T_ROOT_DIR}/task/attempts/${ATTEMPT_NAME}_${RUN_NUMBER}${attempt_suffix}
     mkdir -p "${attempt_dir}"
 
-    echo "exec.sh ::   >> GRID_CUSTOM_XML   = \"${custom_xml}\""
+    echo "exec.sh ::   >> GRID_CUSTOM_XML   = \"${grid_custom_xml}\""
     echo "exec.sh ::   >> ATTEMPT_DIR       = ${attempt_dir}"
 
     cd "${attempt_dir}"
@@ -73,8 +73,7 @@ for index in "${!arr_custom_xml[@]}"; do
     cp "${E2T_ROOT_DIR}/tidentity/macros/Config_marsland_TIdentityPID.C" .
     cp "${E2T_ROOT_DIR}/tidentity/macros/AddTaskFilteredTreeLocal.C" .
 
-    analysis_options="("
-    analysis_options+="\"${MODE}\","
+    analysis_options="\"${MODE}\","
     analysis_options+="\"${INPUT_PATH}\","
     analysis_options+="\"${PRODUCTION_NAME}\","
     analysis_options+="${RUN_NUMBER},"
@@ -82,10 +81,9 @@ for index in "${!arr_custom_xml[@]}"; do
     analysis_options+="${LOCAL_LIMIT_N_EVENTS},"
     analysis_options+="true,"
     analysis_options+="\"${GRID_WORKING_DIR}\","
-    analysis_options+="\"${custom_xml}\""
-    analysis_options+=")"
+    analysis_options+="\"${grid_custom_xml}\""
 
-    aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
+    aliroot_command="aliroot -l -b -q RunTask.C(${analysis_options})"
     echo "${aliroot_command}"
     ${aliroot_command} 2>&1 | tee analysis.log
 done

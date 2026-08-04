@@ -157,11 +157,29 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     fHist_CentralityINT7 = new TH1F("CentralityINT7", ";CentralityINT7;Counts", 42, 0., 105.);
     fOutputList->Add(fHist_CentralityINT7);
 
+    // bookkeeping hists //
     TAxis *x_axis = nullptr;
 
     // -- tracks bookkeeping
     fHist_Tracks_Bookkeeping = new TH1F("Tracks_Bookkeeping", ";;Counts", ETrack::kNTrackCuts, 0., static_cast<double>(ETrack::kNTrackCuts));
-    // x_axis = fHist_Tracks_Bookkeeping->GetXaxis();  // PENDING for when cuts defined
+    x_axis = fHist_Tracks_Bookkeeping->GetXaxis();
+    x_axis->SetBinLabel(ETrack::kAllTracks + 1, "AllTracks");
+    x_axis->SetBinLabel(ETrack::kValidStatusTPC_1 + 1, "ValidStatusTPC_1");
+    x_axis->SetBinLabel(ETrack::kValidStatusTPC_2 + 1, "ValidStatusTPC_2");
+    x_axis->SetBinLabel(ETrack::kNoHitInITS + 1, "NoHitInITS");
+    x_axis->SetBinLabel(ETrack::kPassesMinPreDCAxy + 1, "PassesMinPreDCAxy");
+    x_axis->SetBinLabel(ETrack::kPassesMaxPreDCAxy + 1, "PassesMaxPreDCAxy");
+    x_axis->SetBinLabel(ETrack::kPassesMinPreDCAz + 1, "PassesMinPreDCAz");
+    x_axis->SetBinLabel(ETrack::kPassesMaxPreDCAz + 1, "PassesMaxPreDCAz");
+    x_axis->SetBinLabel(ETrack::kPassesAbsMaxPz + 1, "PassesAbsMaxPz");
+    x_axis->SetBinLabel(ETrack::kPassesMinPt + 1, "PassesMinPt");
+    x_axis->SetBinLabel(ETrack::kPassesMaxPt + 1, "PassesMaxPt");
+    x_axis->SetBinLabel(ETrack::kPassesAbsMaxEta + 1, "PassesAbsMaxEta");
+    x_axis->SetBinLabel(ETrack::kPassesMinNTPCClusters + 1, "PassesMinNTPCClusters");
+    x_axis->SetBinLabel(ETrack::kPassesChi2NClusters + 1, "PassesChi2NClusters");
+    x_axis->SetBinLabel(ETrack::kNotAKink + 1, "NotAKink");
+    x_axis->SetBinLabel(ETrack::kHasValidPid + 1, "HasValidPid");
+    x_axis->SetBinLabel(ETrack::kPidWithinRange + 1, "PidWithinRange");
     fOutputList->Add(fHist_Tracks_Bookkeeping);
 
     // -- pre-found (anti)lambdas
@@ -175,6 +193,7 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxPtLambda + 1, "PassesMaxPtLambda");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesMinDecayRadius2D + 1, "PassesMinDecayRadius2D");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesDCAwrtPV + 1, "PassesDCAwrtPV");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesCPAwrtPV + 1, "PassesCPAwrtPV");
     x_axis->SetBinLabel(EPreFoundLambda::kNegDaughterHasValidPid + 1, "NegDaughterHasValidPid");
     x_axis->SetBinLabel(EPreFoundLambda::kPosDaughterHasValidPid + 1, "PosDaughterHasValidPid");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesPid + 1, "PassesPid");
@@ -224,11 +243,14 @@ bool AliTaskEsd2Tree::UserNotify() {
         fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 3)))->GetString().Atoi();
         fOutput.Event.DirNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 2)))->GetString().Atoi();
         fOutput.Event.DirNumberB = 0;                                              // non-existent in MC
-        AliInfoF("Run Number = %04i", static_cast<int>(fOutput.Event.RunNumber));  // = 1
-        AliInfoF("Dir Number = %04i", static_cast<int>(fOutput.Event.DirNumber));  // = 1
+        AliInfoF("Run Number = %i", static_cast<int>(fOutput.Event.RunNumber));    // = 297595
+        AliInfoF("Dir Number = %03i", static_cast<int>(fOutput.Event.DirNumber));  // = 001
         if (fIsMC_DedicatedSexaquark) {
             TString SimSubSet = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 4)))->GetString();
-            if (!ReadSignalLogs(SimSubSet)) return false;
+            if (!ReadSignalLogs(SimSubSet)) {
+                delete tokens;
+                return false;
+            }
         }
     } else {
         // NOTE: path of real data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root`
@@ -245,7 +267,8 @@ bool AliTaskEsd2Tree::UserNotify() {
 
     // Adapt event cuts  //
 
-    fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kINT7 | AliVEvent::kCentral | AliVEvent::kSemiCentral);
+    // fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kINT7 | AliVEvent::kCentral | AliVEvent::kSemiCentral);
+    fEventCuts.OverrideAutomaticTriggerSelection(AliVEvent::kAny);
 
     // For real data, depending on run number
     // Reference: https://twiki.cern.ch/twiki/bin/view/ALICE/AliDPGRunList18r
@@ -325,7 +348,13 @@ bool AliTaskEsd2Tree::ProcessEvent() {
     // NOTE: exclude h-dibaryon MC, because it doesn't have underlying HIJING event + many detectors are turned off
     if (!fIsMC_DedicatedHdibaryon && !fEventCuts.AcceptEvent(fESD)) return false;
 
-    // Assign branches //
+    // -- trigger classes
+    fOutput.Event.IsINT7 = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) > 0;
+    fOutput.Event.IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) > 0;
+    fOutput.Event.IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) > 0;
+    if (!fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
+
+    // Assign (rest of) branches //
 
     // NOTE: `RunNumber`, `DirNumber` and `DirNumberB` are assigned in `UserNotify()`
     fOutput.Event.EventNumber = fESD->GetEventNumberInFile();
@@ -348,10 +377,6 @@ bool AliTaskEsd2Tree::ProcessEvent() {
         return false;
     }
     fOutput.Event.Centrality = MultSelection->GetMultiplicityPercentile("V0M");
-    // -- trigger classes
-    fOutput.Event.IsINT7 = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) > 0;
-    fOutput.Event.IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) > 0;
-    fOutput.Event.IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) > 0;
 
     // Fill event histograms //
 
@@ -429,6 +454,7 @@ void AliTaskEsd2Tree::ProcessTracks() {
 
     // vector preallocation //
     const int n_tracks = fESD->GetNumberOfTracks();
+    const int n_mc = fIsMC ? fMC->GetNumberOfTracks() : 0;
     fOutput.Track.reserve(n_tracks);
     if (fIsMC) fOutput.Track_McEntry.reserve(n_tracks);
 
@@ -465,10 +491,18 @@ void AliTaskEsd2Tree::ProcessTracks() {
         if (its_in) continue;  // apply cut
         fHist_Tracks_Bookkeeping->Fill(ETrack::kNoHitInITS);
 
-        // pre-calc. dca w.r.t pv // PENDING
+        // pre-calc. dca w.r.t pv
         esd_track->GetImpactParameters(pre_dca, pre_dca_cov);
-        // if (/* add amazing DCA cut here */) continue;  // apply cut
-        // fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesDcaCuts);
+        float pre_dca_xy = std::abs(pre_dca[0]);
+        float pre_dca_z = std::abs(pre_dca[1]);
+        if (pre_dca_xy < E2T::Cuts::Track::Min_PreDCAxy) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAxy);
+        if (pre_dca_xy > E2T::Cuts::Track::Max_PreDCAxy) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAxy);
+        if (pre_dca_z < E2T::Cuts::Track::Min_PreDCAz) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAz);
+        if (pre_dca_z > E2T::Cuts::Track::Max_PreDCAz) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAz);
 
         // max |pz|
         if (std::abs(inner_param->Pz()) > E2T::Cuts::Track::AbsMax_Pz) continue;  // apply cut
@@ -486,12 +520,29 @@ void AliTaskEsd2Tree::ProcessTracks() {
         if (std::abs(inner_param->Eta()) > E2T::Cuts::Track::AbsMax_Eta) continue;  // apply cut
         fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesAbsMaxEta);
 
+        // n clusters
+        // NOTE: `Min_TPC_NClusters` is currently 0, so the explicit zero test below is what protects the division, not the cut
+        auto tpc_n_clusters = esd_track->GetTPCNcls();
+        if (tpc_n_clusters == 0 || tpc_n_clusters < E2T::Cuts::Track::Min_TPC_NClusters) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinNTPCClusters);
+
+        // chi2 / nclusters
+        auto tpc_chi2_ncls = esd_track->GetTPCchi2() / static_cast<double>(tpc_n_clusters);
+        if (tpc_chi2_ncls > E2T::Cuts::Track::Max_TPC_Chi2_NClusters) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesChi2NClusters);
+
+        // kink rejection
+        if (esd_track->GetKinkIndex(0) > 0) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kNotAKink);
+
         // pid (1)
-        auto pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, esd_track);
-        if (pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
+        // NOTE: turned off the cut (was the most expensive), because it fails in 18q, but kept the bookkeeping hist for merging purposes
+        // auto pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, esd_track);
+        // if (pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
         fHist_Tracks_Bookkeeping->Fill(ETrack::kHasValidPid);
 
         // pid (2) -- these functions include corrections (when RD) + tuning on data (when MC)
+        // NOTE: they must run before `GetTPCsignalTunedOnData()` below, which they are what populates
         float n_sigmas_p = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kProton);
         float n_sigmas_k = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kKaon);
         float n_sigmas_pi = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kPion);
@@ -500,20 +551,6 @@ void AliTaskEsd2Tree::ProcessTracks() {
             continue;  // apply cut
         }
         fHist_Tracks_Bookkeeping->Fill(ETrack::kPidWithinRange);
-
-        // n clusters
-        auto tpc_n_clusters = esd_track->GetTPCNcls();
-        if (tpc_n_clusters < E2T::Cuts::Track::Min_TPC_NClusters) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinNTPCClusters);
-
-        // chi2 / nclusters
-        auto tpc_chi2_ncls = esd_track->GetTPCchi2() / static_cast<double>(tpc_n_clusters);  // division protected by prev. cut
-        if (tpc_chi2_ncls > E2T::Cuts::Track::Max_TPC_Chi2NClusters) continue;               // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesChi2NClusters);
-
-        // kink rejection
-        if (esd_track->GetKinkIndex(0) > 0) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kNotAKink);
 
         // create new //
         POD::Track new_track;  // non-initialized on purpose
@@ -526,10 +563,9 @@ void AliTaskEsd2Tree::ProcessTracks() {
         new_track.Px = static_cast<float>(momentum[0]);
         new_track.Py = static_cast<float>(momentum[1]);
         new_track.Pz = static_cast<float>(momentum[2]);
-        new_track.Charge = esd_track->Charge();
         // -- dca
-        new_track.PreDCAxy = std::abs(pre_dca[0]);
-        new_track.PreDCAz = std::abs(pre_dca[1]);
+        new_track.PreDCAxy = pre_dca_xy;
+        new_track.PreDCAz = pre_dca_z;
         // -- pid; for RD, it includes corrections; for MC, this is the correct way
         new_track.TPC_Signal = fIsMC ? static_cast<float>(esd_track->GetTPCsignalTunedOnData()) : static_cast<float>(esd_track->GetTPCsignal());
         new_track.NSigmasPion = n_sigmas_pi;
@@ -541,23 +577,13 @@ void AliTaskEsd2Tree::ProcessTracks() {
             new_track.CovMatrix[idx_cov] = static_cast<float>(cov_xyz_pxpypz[idx_cov]);
         }
         new_track.TPC_FirstRow = GetFirstRow(esd_track->GetTPCClusterMap());
-#if E2T_TPC_EXTRA
         // -- extra tpc branches
-        new_track.TPC_Chi2 = static_cast<float>(esd_track->GetTPCchi2());
-        new_track.TPC_Chi2Constrained = static_cast<float>(esd_track->GetConstrainedChi2TPC());
-        new_track.TPC_Chi2TCVG = static_cast<float>(esd_track->GetChi2TPCConstrainedVsGlobal(fPrimaryVertex));
-        new_track.TPC_ESignalPion = fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, esd_track, AliPID::kPion);
-        new_track.TPC_ESignalKaon = fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, esd_track, AliPID::kKaon);
-        new_track.TPC_ESignalProton = fPIDResponse->GetExpectedSignal(AliPIDResponse::kTPC, esd_track, AliPID::kProton);
-        new_track.TPC_ESigmaPion = fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, esd_track, AliPID::kPion);
-        new_track.TPC_ESigmaKaon = fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, esd_track, AliPID::kKaon);
-        new_track.TPC_ESigmaProton = fPIDResponse->GetExpectedSigma(AliPIDResponse::kTPC, esd_track, AliPID::kProton);
         new_track.TPC_NCrossedRows = esd_track->GetTPCCrossedRows();
-        new_track.TPC_NClusters = esd_track->GetTPCNcls();
-        new_track.TPC_NClustersLC = esd_track->GetTPCncls();  // different from `GetTPCNCls` (uppercase), see wiki
+        new_track.TPC_NClusters = tpc_n_clusters;
         new_track.TPC_NClustersFindable = esd_track->GetTPCNclsF();
-        new_track.TPC_NClustersShared = esd_track->GetTPCnclsS();
-#endif
+        new_track.TPC_Chi2 = static_cast<float>(esd_track->GetTPCchi2());
+        // -- charge
+        new_track.Charge = esd_track->Charge();
 
         // push reconstructed //
         fOutput.Track.emplace_back(new_track);
@@ -573,6 +599,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
 
     // vector preallocation //
     const int n_v0s = fESD->GetNumberOfV0s();
+    const int n_tracks = fESD->GetNumberOfTracks();
+    const int n_mc = fIsMC ? fMC->GetNumberOfTracks() : 0;
     fOutput.PreFoundLambda.reserve(n_v0s);
     if (fIsMC) {
         fOutput.PreFoundLambda_Neg_McEntry.reserve(n_v0s);
@@ -635,21 +663,44 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         if (Common::Math::FastDCA_LineVertex(mom_v0, dv_v0, pv) > E2T::Cuts::PreFoundLambda::Max_DCA_wrt_PV) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesDCAwrtPV);
 
-        // negative daughter's pid
-        auto *neg_track = fESD->GetTrack(v0->GetNindex());
+        // cpa wrt pv
+        if (Common::Math::CosinePointingAngle(mom_v0, dv_v0, pv) < E2T::Cuts::PreFoundLambda::Min_CPA_wrt_PV) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesCPAwrtPV);
 
-        auto neg_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, neg_track);
-        if (neg_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
+        // daughter tracks
+        int neg_index = v0->GetNindex();
+        int pos_index = v0->GetPindex();
+        if (neg_index < 0 || neg_index >= n_tracks || pos_index < 0 || pos_index >= n_tracks) continue;
+        auto *neg_track_v1 = fESD->GetTrack(neg_index);
+        auto *pos_track_v1 = fESD->GetTrack(pos_index);
+        if (neg_track_v1 == nullptr || pos_track_v1 == nullptr) continue;
+        // daughters must have opposite charges
+        if (neg_track_v1->Charge() * pos_track_v1->Charge() >= 0) continue;
+        // quickly confirm their charges
+        AliESDtrack *neg_track = neg_track_v1;
+        if (pos_track_v1->Charge() < 0) {
+            neg_track = pos_track_v1;
+            neg_index = v0->GetPindex();
+        }
+        AliESDtrack *pos_track = pos_track_v1;
+        if (neg_track_v1->Charge() > 0) {
+            pos_track = neg_track_v1;
+            pos_index = v0->GetNindex();
+        }
+
+        // negative daughter's pid
+        // as in `ProcessTracks()`, turned off; expensive + doesn't work for 18q; kept hist bin
+        // auto neg_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, neg_track);
+        // if (neg_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kNegDaughterHasValidPid);
 
         float neg_n_sigmas_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kProton);
         float neg_n_sigmas_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kPion);
 
         // positive daughter's pid
-        auto *pos_track = fESD->GetTrack(v0->GetPindex());
-
-        auto pos_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, pos_track);
-        if (pos_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
+        // as in `ProcessTracks()`, turned off; expensive + doesn't work for 18q; kept hist bin
+        // auto pos_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, pos_track);
+        // if (pos_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPosDaughterHasValidPid);
 
         float pos_n_sigmas_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kProton);
@@ -694,16 +745,17 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         lv_piminus.SetCoordinates(neg_px, neg_py, neg_pz, Common::PdgMass_Pion);
         double m_lambda = (lv_proton + lv_piminus).M();
         double delta_m_lambda = std::abs(m_lambda - Common::PdgMass_Lambda);
-        if (delta_m_antilambda > E2T::Cuts::PreFoundLambda::AbsMax_DeltaInvariantMass &&
-            delta_m_lambda > E2T::Cuts::PreFoundLambda::AbsMax_DeltaInvariantMass) {
-            continue;  // apply cut
-        }
+        // NOTE: the mass hypothesis must agree with the pid hypothesis, otherwise a candidate that is a lambda only by pid and an
+        //       anti-lambda only by mass would survive both cuts
+        bool is_lambda = could_be_lambda && delta_m_lambda < E2T::Cuts::PreFoundLambda::AbsMax_DeltaInvariantMass;
+        bool is_anti_lambda = could_be_anti_lambda && delta_m_antilambda < E2T::Cuts::PreFoundLambda::AbsMax_DeltaInvariantMass;
+        if (!is_lambda && !is_anti_lambda) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesInvariantMass);
 
         // armenteros-podolanski variables
         double arm_alpha = v0->AlphaV0();
         double arm_qt = v0->PtArmV0();
-        if (arm_qt / std::abs(arm_alpha) > E2T::Cuts::PreFoundLambda::AbsSlope_ArmQtOverArmAlpha) continue;  // apply cuts
+        if (arm_qt > E2T::Cuts::PreFoundLambda::AbsSlope_ArmQtOverArmAlpha * std::abs(arm_alpha)) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesArmenterosPodolanski);
 
 #if E2T_VERBOSE
@@ -743,7 +795,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Decay_Z = static_cast<float>(v0->Zv());
         new_lambda.DcaV0Daughters = static_cast<float>(v0->GetDcaV0Daughters());
         // negative daughter //
-        new_lambda.Neg_EsdEntry = static_cast<unsigned int>(v0->GetNindex());
+        new_lambda.Neg_EsdEntry = static_cast<unsigned int>(neg_index);
         new_lambda.Neg_State = {static_cast<float>(neg_position[0]), static_cast<float>(neg_position[1]), static_cast<float>(neg_position[2]),
                                 static_cast<float>(neg_momentum[0]), static_cast<float>(neg_momentum[1]), static_cast<float>(neg_momentum[2])};
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
@@ -758,14 +810,13 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_px);
         new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_py);
         new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_pz);
-#if E2T_TPC_EXTRA
-        new_lambda.Neg_TPC_Chi2 = static_cast<float>(neg_track->GetTPCchi2());
         new_lambda.Neg_TPC_NCrossedRows = neg_track->GetTPCCrossedRows();
         new_lambda.Neg_TPC_NClusters = neg_track->GetTPCNcls();
         new_lambda.Neg_TPC_NClustersFindable = neg_track->GetTPCNclsF();
-#endif
+        new_lambda.Neg_TPC_Chi2 = static_cast<float>(neg_track->GetTPCchi2());
+
         // positive daughter //
-        new_lambda.Pos_EsdEntry = static_cast<unsigned int>(v0->GetPindex());
+        new_lambda.Pos_EsdEntry = static_cast<unsigned int>(pos_index);
         new_lambda.Pos_State = {static_cast<float>(pos_position[0]), static_cast<float>(pos_position[1]), static_cast<float>(pos_position[2]),
                                 static_cast<float>(pos_momentum[0]), static_cast<float>(pos_momentum[1]), static_cast<float>(pos_momentum[2])};
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
@@ -780,12 +831,10 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_px);
         new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_py);
         new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_pz);
-#if E2T_TPC_EXTRA
-        new_lambda.Pos_TPC_Chi2 = static_cast<float>(pos_track->GetTPCchi2());
         new_lambda.Pos_TPC_NCrossedRows = pos_track->GetTPCCrossedRows();
         new_lambda.Pos_TPC_NClusters = pos_track->GetTPCNcls();
         new_lambda.Pos_TPC_NClustersFindable = pos_track->GetTPCNclsF();
-#endif
+        new_lambda.Pos_TPC_Chi2 = static_cast<float>(pos_track->GetTPCchi2());
 
         // push reconstructed //
         fOutput.PreFoundLambda.emplace_back(new_lambda);
@@ -845,7 +894,7 @@ bool AliTaskEsd2Tree::ReadSignalLogs(const TString &sim_sub_set) {
 
     bool copy_succesful = false;
     if (AliEn_Dir.BeginsWith("alien://")) {
-        if (TGrid::Connect("alien://") == nullptr) return false;
+        if (gGrid == nullptr && TGrid::Connect("alien://") == nullptr) return false;
         copy_succesful = TFile::Cp(Form("%s", orig_path.Data()), Form("file://./%s", SignalLog_NewBasename.Data()));
     } else {
         copy_succesful = gSystem->CopyFile(Form("%s", orig_path.Data()), Form("./%s", SignalLog_NewBasename.Data()), true) == 0;

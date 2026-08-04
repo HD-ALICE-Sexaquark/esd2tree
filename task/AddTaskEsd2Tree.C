@@ -9,7 +9,7 @@ AliTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_sexa_mc, bool is_hdib_mc) {
 
     auto *task = new AliTaskEsd2Tree("AliTaskEsd2Tree");
 
-    // NOTE: `SelectCollisionCandidates` omitted because it's done within the task's `PassesEventSelection`
+    // NOTE: `SelectCollisionCandidates` omitted because the trigger selection is done by `fEventCuts` within the task's `ProcessEvent`
     task->Initialize(is_mc, is_sexa_mc, is_hdib_mc);
 
     mgr->AddTask(task);

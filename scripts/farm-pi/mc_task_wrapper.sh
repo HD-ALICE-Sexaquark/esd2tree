@@ -9,10 +9,11 @@ shopt -s nullglob
 
 export MODE="local"
 export LOCAL_N_DIRS=6 # gets overriden for 26h
-MAX_PARALLEL_JOBS=45
+MAX_PARALLEL_JOBS=72 # pi server only
 # reaction_channels=("A") # "A" "D" "H"
 # injected_masses=(1.8) # (1.73 1.8 1.87 1.94 2.01)
-rmasses_pairs=("A1.73" "A2.01" "D1.8" "H1.8")
+# rmasses_pairs=("D1.73")
+rmasses_pairs=("A1.73" "D1.73" "H1.73")
 
 print_usage() {
     echo "usage: ./mc_task_wrapper.sh <production_name> [max_rn]";
