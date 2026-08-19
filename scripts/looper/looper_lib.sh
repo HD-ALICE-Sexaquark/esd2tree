@@ -47,7 +47,10 @@ log_msg() {
     echo -e "${script_name}(${GRID_USERNAME:-?}) :: ${context} :: $(now_cool) :: $*" | tee -a "${LOOPER_LOGS_DIR}/${script_name}.log" >&2
 }
 
+# === helpers === #
+
 # Minutes between two date strings; echoes -1 if either can't be parsed.
+# usage: minutes_between <start> <end>
 minutes_between() {
     local start_secs end_secs
     if ! start_secs=$(date -d "$1" +%s 2>/dev/null) || ! end_secs=$(date -d "$2" +%s 2>/dev/null); then
@@ -55,6 +58,18 @@ minutes_between() {
         return 0
     fi
     echo $(( (end_secs - start_secs) / 60 ))
+}
+
+# usage:
+# to_kb "512 MB"      # = 524288
+# echo "2 GB" | to_kb # = 2097152
+# to_kb "1.5 GB"      # = 1572864
+to_kb() {
+    local input="${1:-$(cat)}"
+    local value unit
+    read -r value unit <<< "$input"
+    unit="${unit%[Bb]}" # "MB" -> "M", "KB" -> "K", "GB" -> "G", "B" -> ""
+    numfmt --from=iec --to-unit=1024 "${value}${unit}"
 }
 
 # === db state file operations === #
@@ -159,38 +174,84 @@ db_get_unique_prop_where() {
 
 # === quota checks === #
 
+# hardcoded settings
+avg_subjob_size_kb=512000     # average AnalysisResults.root size per subjob
+avg_subjobs_per_masterjob=150
+fquota_margin_pct=10          # safety headroom in %
+jquota_margin_pct=15          # safety headroom in %
+
 check_quotas() {
     local script_name=$1
-    check_jquota "$script_name" && check_fquota "$script_name" # 0 if both quotas are fine; non-zero otherwise
+    local db_file=$2
+    local n_new_subjobs=${3:-${avg_subjobs_per_masterjob}}
+    # return 0 if both quotas are within limits; non-zero otherwise
+    check_jquota "${script_name}" && check_fquota "${script_name}" "${db_file}" "${n_new_subjobs}"
 }
 
 check_jquota() {
     local script_name=$1
-    local eighty_percent=8000000 # hardcoded, 80% of total
     local jquota_output
     jquota_output=$(alien.py jquota list "${GRID_USERNAME}" || true)
-    local total_running_time total_cpu_cost
-    total_running_time=$(awk '/totalRunningTimeLast24h/ { print $3 }' <<< "${jquota_output}")
-    total_cpu_cost=$(awk '/totalCpuCostLast24h/ { print $3 }' <<< "${jquota_output}")
-    if [[ ! ${total_running_time} =~ ^[0-9]+$ || ! ${total_cpu_cost} =~ ^[0-9]+$ ]]; then
+    local max_running_time max_cpu_cost limit_running_time limit_cpu_cost running_time cpu_cost
+    max_running_time=$(awk '/maxTotalRunningTime/ { print $3 }' <<< "${jquota_output}")
+    max_cpu_cost=$(awk '/maxTotalCpuCost/ { print $3 }' <<< "${jquota_output}")
+    limit_running_time=$((max_running_time * (100 - jquota_margin_pct) / 100))
+    limit_cpu_cost=$((max_cpu_cost * (100 - jquota_margin_pct) / 100))
+    running_time=$(awk '/totalRunningTimeLast24h/ { print $3 }' <<< "${jquota_output}")
+    cpu_cost=$(awk '/totalCpuCostLast24h/ { print $3 }' <<< "${jquota_output}")
+    if [[ ! ${max_running_time} =~ ^[0-9]+$ || ! ${max_cpu_cost} =~ ^[0-9]+$ ||
+          ! ${running_time} =~ ^[0-9]+$ || ! ${cpu_cost} =~ ^[0-9]+$ ]]; then
         log_msg "${script_name}" "check_jquota" "warning :: could not parse jquota output, assuming quota is fine"
         return 0
     fi
-    [[ ${total_running_time} -le ${eighty_percent} && ${total_cpu_cost} -le ${eighty_percent} ]]
+    # return 0 if running time and cpu cost are within limits
+    [[ ${running_time} -le ${limit_running_time} && ${cpu_cost} -le ${limit_cpu_cost} ]]
+}
+
+# echoes the value of an exactly-matching key
+# usage: fquota_field <fquota_output> <key>
+fquota_field() {
+    # output of `alien.py fquota list <grid username>`:
+    # FQuota: user: aborquez
+    # totalSize               : 484.3 GB (23.65% of max)
+    # maxTotalSize            : 2 TB
+    # tmpIncreasedTotalSize   : 0 B
+    # nbFiles                 : 2838 (0.946% of max)
+    # maxNbFiles              : 300000
+    # tmpIncreasedNbFiles     : 0
+    awk -v key="$2" -F' *: *' '$1 ~ "^[[:space:]]*"key"[[:space:]]*$" { print $2; exit }' <<< "$1"
 }
 
 check_fquota() {
     local script_name=$1
+    local db_file=$2
+    local n_new_subjobs=${3:-${avg_subjobs_per_masterjob}}
+    # get fquota for current user, output example shown above in `fquota_field`
     local fquota_output
     fquota_output=$(alien.py fquota list "${GRID_USERNAME}" || true)
-    local usage_pct files_pct
-    usage_pct=$(echo "${fquota_output}" | grep "totalSize" | grep -oE '[0-9.]+%' | tr -d '%' || true)
-    files_pct=$(echo "${fquota_output}" | grep "nbFiles" | grep -oE '[0-9.]+%' | tr -d '%' || true)
-    if [[ -z ${usage_pct} || -z ${files_pct} ]]; then
-        log_msg "${script_name}" "check_fquota" "warning :: could not parse fquota output, assuming quota is fine"
-        return 0
+    # define vars
+    local used max limit pending reserved requested projected
+    local nb_files max_files limit_files projected_files
+    used=$(fquota_field "${fquota_output}" totalSize | awk '{print $1,$2}' | to_kb)
+    max=$(fquota_field "${fquota_output}" maxTotalSize | to_kb)
+    nb_files=$(fquota_field "${fquota_output}" nbFiles | awk '{print $1}')
+    max_files=$(fquota_field "${fquota_output}" maxNbFiles)
+    if [[ -z ${used} || -z ${max} || -z ${nb_files} || -z ${max_files} ||
+          ! ${used} =~ ^[0-9]+$ || ! ${max} =~ ^[0-9]+$ || ! ${nb_files} =~ ^[0-9]+$ || ! ${max_files} =~ ^[0-9]+$ ]]; then
+        log_msg "${script_name}" "check_fquota" "warning :: could not parse fquota output, assuming usage is outside limits"
+        return 1
     fi
-    awk -v s="${usage_pct}" -v f="${files_pct}" 'BEGIN { exit (s > 95 || f > 95) }'
+    pending=$(db_count_where "${db_file}" "state IN ('SUBMITTED','RESUBMITTED')") # n pending subjobs, whose storage hasn't been accounted yet in fquota
+    # estimate storage
+    limit=$((max * (100 - fquota_margin_pct) / 100))
+    reserved=$((pending * avg_subjob_size_kb))
+    requested=$((n_new_subjobs * avg_subjob_size_kb))
+    projected=$((used + reserved + requested))
+    # estimate n files
+    limit_files=$((max_files * (100 - fquota_margin_pct) / 100))
+    projected_files=$((nb_files + pending + n_new_subjobs))
+    # return 0 if projected storage is less than limit
+    [[ ${projected} -le ${limit} && ${projected_files} -le ${limit_files} ]]
 }
 
 # === production resolution === #

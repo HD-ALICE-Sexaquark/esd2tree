@@ -64,13 +64,13 @@ submit_masterjob() {
     fi
 
     # check quotas
-    if ! check_quotas "${script_name}"; then
+    if ! check_quotas "${script_name}" "${db_file}"; then
         log_msg "${script_name}" "${job_tag}" "fatal :: quota exceeded, exiting, try again later"
         exit 1
     fi
 
     # handle tidentity macros
-    local include_tidentity=true
+    local include_tidentity=false # temporary, while i wait for ilya to clean his storage... u_u
     if [[ ${data_kind} == "mc" ]]; then include_tidentity=false; fi
 
     # submit jobs via aliroot

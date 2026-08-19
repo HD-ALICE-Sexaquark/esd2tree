@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# `esd2vector/scripts/farm-pi/mc_task_exec.sh`
-# ============================================
-# NOTE: don't execute this script directly, it is meant to be used by `esd2vector/scripts/farm-pi/mc_task_wrapper.sh`
+# `esd2vector/scripts/farm-pi/slurm_exec.sh`
+# ==========================================
+# NOTE: don't execute this script directly, it is meant to be used by `esd2vector/scripts/farm-pi/slurm_wrapper.sh`
 
 #SBATCH --partition=main
 #SBATCH --time=2:00:00
@@ -16,10 +16,12 @@ if [[ -z ${LOCAL_SIMS_DIR:-} ]]; then echo "error: missing env. var. LOCAL_SIMS_
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 # -- batch options
 if [[ -z ${MODE:-} ]]; then echo "error: missing env. var. MODE"; exit 1; fi
-if [[ -z ${LOCAL_N_DIRS:-} ]]; then echo "error: missing env. var. LOCAL_N_DIRS"; exit 1; fi
+if [[ -z ${MAX_N_DN_DIRS:-} ]]; then echo "error: missing env. var. MAX_N_DN_DIRS"; exit 1; fi
 if [[ -z ${PRODUCTION_NAME:-} ]]; then echo "error: missing env. var. PRODUCTION_NAME"; exit 1; fi
 # -- per run number options
 if [[ -z ${RUN_NUMBERS_STR:-} ]]; then echo "error: missing env. var. RUN_NUMBERS_STR"; exit 1; fi
+# -- slurm var
+if [[ -z ${SLURM_ARRAY_TASK_ID:-} ]]; then echo "error: missing env. var. SLURM_ARRAY_TASK_ID"; exit 1; fi
 
 # define input path
 reaction_channel=""
@@ -44,10 +46,10 @@ read -ra RUN_NUMBERS_ARR <<< "${RUN_NUMBERS_STR}" # string -> array (because Slu
 run_number=${RUN_NUMBERS_ARR[${SLURM_ARRAY_TASK_ID}]}
 
 # prepare output dirs
-red_prod_name=${PRODUCTION_NAME/LHC/} # remove 'LHC'
+short_prod_name=${PRODUCTION_NAME/LHC/} # remove 'LHC'
 simset_suffix=""
 if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then simset_suffix="_${reaction_channel}${injected_mass}"; fi
-simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${red_prod_name}${simset_suffix}
+simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${short_prod_name}${simset_suffix}
 rn_outdir=${simset_outdir}/${run_number}
 mkdir -p "${rn_outdir}"
 
@@ -78,15 +80,13 @@ cp "${E2T_ROOT_DIR}/tidentity/macros/AddTaskFilteredTreeLocal.C" .
 
 # main command #
 
-analysis_options="("
-analysis_options+="\"${MODE}\","
+analysis_options="\"${MODE}\","
 analysis_options+="\"${input_path}\","
 analysis_options+="\"${PRODUCTION_NAME}\","
 analysis_options+="${run_number},"
-analysis_options+="${LOCAL_N_DIRS}"
-analysis_options+=")"
+analysis_options+="${MAX_N_DN_DIRS}"
 
-aliroot_command="aliroot -l -b -q RunTask.C${analysis_options}"
+aliroot_command="aliroot -l -b -q RunTask.C(${analysis_options})"
 echo "${aliroot_command}"
 ${aliroot_command}
 

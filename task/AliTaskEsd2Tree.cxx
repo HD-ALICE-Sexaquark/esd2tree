@@ -349,10 +349,11 @@ bool AliTaskEsd2Tree::ProcessEvent() {
     if (!fIsMC_DedicatedHdibaryon && !fEventCuts.AcceptEvent(fESD)) return false;
 
     // -- trigger classes
+    // NOTE: same as above, exclude h-dibaryon MC
     fOutput.Event.IsINT7 = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) > 0;
     fOutput.Event.IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) > 0;
     fOutput.Event.IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) > 0;
-    if (!fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
+    if (!fIsMC_DedicatedHdibaryon && !fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
 
     // Assign (rest of) branches //
 

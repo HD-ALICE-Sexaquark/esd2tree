@@ -107,7 +107,8 @@ while true; do
 
             # from here on, the job either failed or may be stale, so a resubmission could follow
 
-            if ! check_quotas "${script_name}"; then
+            # check quotas; specifically, if fquota allows 1 more subjob
+            if ! check_quotas "${script_name}" "${db_file}" 1; then
                 log_msg "${script_name}" "check_quotas" "warning :: skipping subjob ${subjob_id}"
                 continue
             fi
