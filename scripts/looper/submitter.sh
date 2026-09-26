@@ -11,7 +11,7 @@ shopt -s nullglob
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_ABORQUEZ_HOME_DIR
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_XXX_HOME_DIR
 
 # command-line argument
 if [[ $# -ne 2 || ( $1 != "mc" && $1 != "rd" ) || ! -f $2 ]]; then
@@ -64,7 +64,7 @@ submit_masterjob() {
     fi
 
     # check quotas
-    if ! check_quotas "${script_name}" "${db_file}"; then
+    if ! check_quotas "${script_name}" "${db_file}" "${data_kind}"; then
         log_msg "${script_name}" "${job_tag}" "fatal :: quota exceeded, exiting, try again later"
         exit 1
     fi
@@ -109,8 +109,8 @@ submit_masterjob() {
     # wait until the subjobs appear (hardcoded: one attempt per 30 secs, 10 attempts, 5 min total)
     # example output of `alien.py ps -m`:
     # ```
-    #     aborquez 3525965811    W                         TaskEsd2Tree.sh
-    #     aborquez 3525965812    D                         TaskEsd2Tree.sh
+    #     username 3525965811    W                         TaskEsd2Tree.sh
+    #     username 3525965812    D                         TaskEsd2Tree.sh
     # ```
     local subjobs_arr=()
     for (( attempt = 0; attempt < 10; attempt++ )); do
@@ -234,7 +234,7 @@ while IFS= read -r line_from_rn_list; do
                 xml_chunk=$(( index + 1 ))
                 local_xml_file="${xml_files_arr[${index}]}"
                 remote_xml_file="${local_xml_file#*/xml/}" # remove everything behind and including '/xml/'
-                remote_xml_file="${GRID_ABORQUEZ_HOME_DIR}/xml/${production_name}/${run_number}/$(basename "${local_xml_file}")"
+                remote_xml_file="${GRID_XXX_HOME_DIR}/xml/${production_name}/${run_number}/$(basename "${local_xml_file}")"
                 # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
                 #                  <tag> <grid_working_dir> <local_xml> <local_dir>
                 submit_masterjob "rd" \
@@ -248,7 +248,7 @@ while IFS= read -r line_from_rn_list; do
             done # end of loop over xml files
         else
             # read_tags_instead_of_rn == 1
-            remote_xml_file="${GRID_ABORQUEZ_HOME_DIR}/xml/${production_name}/${run_number}/${line_from_rn_list}.xml"
+            remote_xml_file="${GRID_XXX_HOME_DIR}/xml/${production_name}/${run_number}/${line_from_rn_list}.xml"
             # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
             #                  <tag> <grid_working_dir> <local_xml> <local_dir>
             submit_masterjob "rd" \

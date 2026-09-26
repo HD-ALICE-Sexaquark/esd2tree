@@ -17,7 +17,7 @@ shopt -s nullglob
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_ABORQUEZ_HOME_DIR
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_XXX_HOME_DIR
 
 # command-line argument
 if [[ $# -ne 1 || ( $1 != "mc" && $1 != "rd" ) ]]; then
@@ -81,10 +81,10 @@ while true; do
     for masterjob_id in "${active_masterjobs[@]}"; do
         # example output of `alien.py ps`:
         # ```
-        #     aborquez 3525965811    W                      TaskEsd2Tree.sh
-        #     aborquez 3525965812    D                      TaskEsd2Tree.sh
-        #     aborquez 3525965818   EE                      TaskEsd2Tree.sh
-        #     aborquez 3525965820  EIB                      TaskEsd2Tree.sh
+        #     username 3525965811    W                      TaskEsd2Tree.sh
+        #     username 3525965812    D                      TaskEsd2Tree.sh
+        #     username 3525965818   EE                      TaskEsd2Tree.sh
+        #     username 3525965820  EIB                      TaskEsd2Tree.sh
         # ```
         # loop over subjobs that belong to this masterjob
         mapfile -t ps_lines < <(alien.py ps -m "${masterjob_id}" 2>/dev/null || true)
@@ -108,7 +108,7 @@ while true; do
             # from here on, the job either failed or may be stale, so a resubmission could follow
 
             # check quotas; specifically, if fquota allows 1 more subjob
-            if ! check_quotas "${script_name}" "${db_file}" 1; then
+            if ! check_quotas "${script_name}" "${db_file}" "${data_kind}" 1; then
                 log_msg "${script_name}" "check_quotas" "warning :: skipping subjob ${subjob_id}"
                 continue
             fi

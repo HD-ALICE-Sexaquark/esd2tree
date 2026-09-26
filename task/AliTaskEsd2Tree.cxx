@@ -888,23 +888,34 @@ bool AliTaskEsd2Tree::ReadSignalLogs(const TString &sim_sub_set) {
     TString AliEn_Dir = fAliEnPath(0, fAliEnPath.Last('/'));
 
     TString orig_path = Form("%s/sim.log", AliEn_Dir.Data());
-    AliInfoF("Copying file %s ...", orig_path.Data());
+    TString new_path = orig_path;
 
-    TString SignalLog_NewBasename =
-        Form("sim_%s_%i_%03i.log", sim_sub_set.Data(), fOutput.Event.RunNumber, static_cast<int>(fOutput.Event.DirNumber));
+    if (gGrid == nullptr) {
+        // in local mode, try to copy the file
+        AliInfoF("Copying file %s ...", orig_path.Data());
 
-    bool copy_succesful = false;
-    if (AliEn_Dir.BeginsWith("alien://")) {
-        if (gGrid == nullptr && TGrid::Connect("alien://") == nullptr) return false;
-        copy_succesful = TFile::Cp(Form("%s", orig_path.Data()), Form("file://./%s", SignalLog_NewBasename.Data()));
+        TString SignalLog_NewBasename =
+            Form("sim_%s_%i_%03i.log", sim_sub_set.Data(), fOutput.Event.RunNumber, static_cast<int>(fOutput.Event.DirNumber));
+
+        bool copy_succesful = false;
+        if (AliEn_Dir.BeginsWith("alien://")) {
+            if (TGrid::Connect("alien://") == nullptr) return false;
+            copy_succesful = TFile::Cp(Form("%s", orig_path.Data()), Form("file://./%s", SignalLog_NewBasename.Data()));
+        } else {
+            copy_succesful = gSystem->CopyFile(Form("%s", orig_path.Data()), Form("./%s", SignalLog_NewBasename.Data()), true) == 0;
+        }
+        if (!copy_succesful) return false;
+
+        new_path = Form("%s/%s", gSystem->pwd(), SignalLog_NewBasename.Data());
     } else {
-        copy_succesful = gSystem->CopyFile(Form("%s", orig_path.Data()), Form("./%s", SignalLog_NewBasename.Data()), true) == 0;
+        // grid mode, bring archive to node dir and unzip file
+        TFile::Cp(Form("%s/log_archive", AliEn_Dir.Data()), "file:./log_archive.zip");
+        gSystem->Exec("unzip -o -q log_archive.zip sim.log");
+        new_path = "sim.log";
     }
-    if (!copy_succesful) return false;
 
     // (3) Read signal logs //
 
-    TString new_path = Form("%s/%s", gSystem->pwd(), SignalLog_NewBasename.Data());
     AliInfoF("Opening file %s ...", new_path.Data());
 
     std::ifstream SimLogFile(new_path);
@@ -950,7 +961,7 @@ bool AliTaskEsd2Tree::ReadSignalLogs(const TString &sim_sub_set) {
     }  // finish reading lines
 
 #if E2T_VERBOSE
-    for (int ev_print = 0; ev_print < E2T::NEventsInDedicatedMC; ++ev_print) {
+    for (int ev_print = 0; ev_print < E2T::NEventsInDedicatedMCFile; ++ev_print) {
         for (int r_print = 0; r_print < E2T::NSexaReactionsPerEvent; ++r_print) {
             std::cout << "Event " << ev_print << ", Reaction " << r_print << ":" << '\n';
             std::cout << "  ReactionID: " << fEvVec_ReactionID[ev_print][r_print] << '\n';

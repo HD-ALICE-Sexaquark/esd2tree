@@ -184,14 +184,14 @@ void RunTask(const char *Mode,            // "local", "grid"
     Bool_t pid_tune_on_data = IsMC;
     TString pid_reco_pass = "";
     Bool_t pid_cache_pid = kFALSE;
-    TString pid_path_oadb =
-        AliDataFile::GetFileNameOADB("COMMON/PID/data/TPCPIDResponseOADB_pileupCorr.root");  // NOTE: large storage file not in common repos
-    TString pid_path_eta_maps = "$ALICE_PHYSICS/OADB/COMMON/PID/data/TPCetaMaps_pileupCorr.root";
+    TString pid_path_oadb = "COMMON/PID/data/TPCPIDResponseOADB_pileupCorr.root";
+    if (!IsGridMode) pid_path_oadb = AliDataFile::GetFileNameOADB(pid_path_oadb.Data());
+    TString pid_path_eta_maps = "${ALICE_PHYSICS}/OADB/COMMON/PID/data/TPCetaMaps_pileupCorr.root";
     TString pid_det_response = Form("TPC-OADB:%s;TPC-Maps:%s", pid_path_oadb.Data(), pid_path_eta_maps.Data());
     TString TaskPIDResponse_Options = Form("(%i, %i, %i, \"%s\", %i, \"%s\")", (int)pid_is_mc, (int)pid_auto_mc_esd, (int)pid_tune_on_data,
                                            pid_reco_pass.Data(), pid_cache_pid, pid_det_response.Data());
     auto *TaskPIDResponse = reinterpret_cast<AliAnalysisTaskPIDResponse *>(
-        gInterpreter->ExecuteMacro("$ALICE_ROOT/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
+        gInterpreter->ExecuteMacro("${ALICE_ROOT}/ANALYSIS/macros/AddTaskPIDResponse.C" + TaskPIDResponse_Options));
     if (TaskPIDResponse == nullptr) return;
 
     /*
@@ -236,7 +236,7 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     // # Init Analysis Manager # //
 
-    mgr->SetDebugLevel(0);
+    mgr->SetDebugLevel(0);  // kFatal = 0, kError = 1, kWarning = 2, kInfo = 3
     if (!mgr->InitAnalysis()) return;
 
     std::cout << "INFO  !! RunTask.C !! Passed InitAnalysis" << '\n';

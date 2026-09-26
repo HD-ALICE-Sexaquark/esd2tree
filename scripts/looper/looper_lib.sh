@@ -175,17 +175,19 @@ db_get_unique_prop_where() {
 # === quota checks === #
 
 # hardcoded settings
-avg_subjob_size_kb=512000     # average AnalysisResults.root size per subjob
-avg_subjobs_per_masterjob=150
-fquota_margin_pct=10          # safety headroom in %
-jquota_margin_pct=15          # safety headroom in %
+avg_rd_subjob_size_kb=512000 # average AnalysisResults.root size per subjob
+avg_mc_subjob_size_kb=384000
+avg_rd_subjobs_per_masterjob=150
+avg_mc_subjobs_per_masterjob=20
+fquota_margin_pct=10 # safety headroom in %
+jquota_margin_pct=15 # safety headroom in %
 
 check_quotas() {
     local script_name=$1
     local db_file=$2
-    local n_new_subjobs=${3:-${avg_subjobs_per_masterjob}}
+    local data_kind=$3
     # return 0 if both quotas are within limits; non-zero otherwise
-    check_jquota "${script_name}" && check_fquota "${script_name}" "${db_file}" "${n_new_subjobs}"
+    check_jquota "${script_name}" && check_fquota "${script_name}" "${db_file}" "${data_kind}" "${4:-}" # optional arg
 }
 
 check_jquota() {
@@ -212,7 +214,7 @@ check_jquota() {
 # usage: fquota_field <fquota_output> <key>
 fquota_field() {
     # output of `alien.py fquota list <grid username>`:
-    # FQuota: user: aborquez
+    # FQuota: user: username
     # totalSize               : 484.3 GB (23.65% of max)
     # maxTotalSize            : 2 TB
     # tmpIncreasedTotalSize   : 0 B
@@ -225,7 +227,14 @@ fquota_field() {
 check_fquota() {
     local script_name=$1
     local db_file=$2
-    local n_new_subjobs=${3:-${avg_subjobs_per_masterjob}}
+    local data_kind=$3
+    local default_n_new_subjobs=${avg_rd_subjobs_per_masterjob}
+    local avg_subjob_size_kb=${avg_rd_subjob_size_kb}
+    if [[ ${data_kind} == "mc" ]]; then
+        default_n_new_subjobs=${avg_mc_subjobs_per_masterjob}
+        avg_subjob_size_kb=${avg_mc_subjob_size_kb}
+    fi
+    local n_new_subjobs=${4:-${default_n_new_subjobs}}
     # get fquota for current user, output example shown above in `fquota_field`
     local fquota_output
     fquota_output=$(alien.py fquota list "${GRID_USERNAME}" || true)
