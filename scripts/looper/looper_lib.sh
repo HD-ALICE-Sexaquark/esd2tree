@@ -316,12 +316,7 @@ stage_analysis_files() {
                 common/Math.hpp \
                 common/Framework_TeeTree.hpp \
                 common/Cuts_E2T.hpp \
-                common/Constants.hpp \
-                tidentity/macros/AddTask_marsland_TIdentityPID.C \
-                tidentity/macros/AliAnalysisTaskTIdentityPID.cxx \
-                tidentity/macros/AliAnalysisTaskTIdentityPID.h \
-                tidentity/macros/Config_marsland_TIdentityPID.C \
-                tidentity/macros/AddTaskFilteredTreeLocal.C; do
+                common/Constants.hpp; do
         cp "${src_dir}/${file}" "${dest_dir}/"
     done
 }
@@ -329,7 +324,7 @@ stage_analysis_files() {
 # === analysis command builder === #
 
 # usage: build_analysis_command <mode> <input_path> <production_name> <run_number> \
-#                               <n_dirs> <limit_n_events> <include_tidentity> <grid_working_dir> <custom_xml>
+#                               <n_dirs> <limit_n_events> <grid_working_dir> <custom_xml>
 build_analysis_command() {
     local opts="("
     opts+="\"$1\","   # Mode
@@ -338,9 +333,8 @@ build_analysis_command() {
     opts+="$4,"       # RunNumber
     opts+="${5},"     # Local_NDirs
     opts+="${6},"     # Local_LimitToNEvents
-    opts+="${7},"     # include_tidentity
-    opts+="\"${8}\"," # Grid_WorkingDir
-    opts+="\"${9}\""  # Grid_CustomXML
+    opts+="\"${7}\"," # Grid_WorkingDir
+    opts+="\"${8}\""  # Grid_CustomXML
     opts+=")"
     echo "aliroot -l -b -q RunTask.C${opts}"
 }

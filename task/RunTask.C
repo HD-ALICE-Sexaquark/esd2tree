@@ -17,14 +17,6 @@
 #include <AliPhysicsSelectionTask.h>
 #include <AliTaskConfigOCDB.h>
 
-// clang-format off
-R__ADD_INCLUDE_PATH($ALICE_PHYSICS)
-#include "PWGPP/TPC/macros/AddTaskConfigOCDB.C"
-#include "AddTaskFilteredTreeLocal.C"
-#include "AliAnalysisTaskTIdentityPID.h"
-#include "AddTask_marsland_TIdentityPID.C"
-// clang-format on
-
 #include "AliTaskEsd2Tree.h"
 
 void RunTask(const char *Mode,            // "local", "grid"
@@ -38,7 +30,6 @@ void RunTask(const char *Mode,            // "local", "grid"
              int Local_NDirs = 1,                 // number of subdirs~files to run
              long long Local_LimitToNEvents = 0,  // 0 means all events
              /* only valid when "grid" */
-             bool include_tidentity = false,    //
              const char *Grid_WorkingDir = "",  // customize output dirs, relative to GRID's home dir
              const char *Grid_CustomXML = ""    // if not empty, get input files from custom XML instead of automatically generating one
 ) {
@@ -88,11 +79,6 @@ void RunTask(const char *Mode,            // "local", "grid"
         TString additional_libs =
             "AliTaskEsd2Tree.cxx AliTaskEsd2Tree.h AliTaskEsd2Tree_LinkDef.h Constants.hpp Framework_TeeTree.hpp Schema_Events.hpp "
             "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp Cuts_E2T.hpp Math.hpp";
-        if (include_tidentity) {
-            additional_libs +=
-                " AddTask_marsland_TIdentityPID.C AliAnalysisTaskTIdentityPID.cxx AliAnalysisTaskTIdentityPID.h Config_marsland_TIdentityPID.C "
-                "AddTaskFilteredTreeLocal.C";
-        }
         alienHandler->SetAdditionalLibs(additional_libs);
         alienHandler->SetTTL(TimeToLive);
         alienHandler->SetDefaultOutputs(false);
@@ -215,24 +201,6 @@ void RunTask(const char *Mode,            // "local", "grid"
     if (TaskEsd2Tree == nullptr) return;
 
     std::cout << "INFO  !! RunTask.C !! Passed addition of main task" << '\n';
-
-    // # Add Ilya's Tasks # //
-
-    if (include_tidentity && !IsMC && ProductionName_TStr == "LHC18r") {
-        auto *TaskConfigOCDB = AddTaskConfigOCDB("raw://");
-        if (TaskConfigOCDB == nullptr) return;
-
-        AliAnalysisTask *TaskFilteredTree = AddTaskFilteredTreeLocal("", IsMC);
-        if (TaskFilteredTree == nullptr) return;
-
-        gInterpreter->LoadMacro("AliAnalysisTaskTIdentityPID.cxx++g");
-
-        // Reference:
-        // aliroot -b -q
-        // 'runGrid.C(0,0,"full",1,"3","$RUN_ON_GRID_DIR/Ebye/lists/runs50longest-2018-LHC18q-pass3.list","PWGPP695_MC_remapping",0,4,0,2018,"18q",3,"vAN-20221119_O2-1")'
-        AliAnalysisTask *TaskTIdentity = AddTask_marsland_TIdentityPID(kFALSE, "Config_marsland_TIdentityPID.C", 4, 2018, "18r", PassNumber);
-        if (TaskTIdentity == nullptr) return;
-    }
 
     // # Init Analysis Manager # //
 

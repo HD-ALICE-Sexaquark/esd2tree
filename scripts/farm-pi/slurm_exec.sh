@@ -72,12 +72,6 @@ cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
 cp "${E2T_ROOT_DIR}/common/Cuts_E2T.hpp" .
 cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
 
-cp "${E2T_ROOT_DIR}/tidentity/macros/AddTask_marsland_TIdentityPID.C" .
-cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.cxx" .
-cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.h" .
-cp "${E2T_ROOT_DIR}/tidentity/macros/Config_marsland_TIdentityPID.C" .
-cp "${E2T_ROOT_DIR}/tidentity/macros/AddTaskFilteredTreeLocal.C" .
-
 # main command #
 
 analysis_options="\"${MODE}\","

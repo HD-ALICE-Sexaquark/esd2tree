@@ -56,22 +56,16 @@ for index in "${!arr_custom_xml[@]}"; do
     cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree.cxx" .
     cp "${E2T_ROOT_DIR}/task/AliTaskEsd2Tree_LinkDef.h" .
     cp "${E2T_ROOT_DIR}/task/AddTaskEsd2Tree.C" .
-    cp "${E2T_ROOT_DIR}/common/Schema_Events.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
-    cp "${E2T_ROOT_DIR}/common/Math.hpp" .
-    cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
-    cp "${E2T_ROOT_DIR}/common/Cuts_E2T.hpp" .
     cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
-
-    cp "${E2T_ROOT_DIR}/tidentity/macros/AddTask_marsland_TIdentityPID.C" .
-    cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.cxx" .
-    cp "${E2T_ROOT_DIR}/tidentity/macros/AliAnalysisTaskTIdentityPID.h" .
-    cp "${E2T_ROOT_DIR}/tidentity/macros/Config_marsland_TIdentityPID.C" .
-    cp "${E2T_ROOT_DIR}/tidentity/macros/AddTaskFilteredTreeLocal.C" .
+    cp "${E2T_ROOT_DIR}/common/Cuts_E2T.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Math.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
+    cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .
+    cp "${E2T_ROOT_DIR}/common/Schema_Events.hpp" .
 
     analysis_options="\"${MODE}\","
     analysis_options+="\"${INPUT_PATH}\","
@@ -79,7 +73,6 @@ for index in "${!arr_custom_xml[@]}"; do
     analysis_options+="${RUN_NUMBER},"
     analysis_options+="${LOCAL_N_DIRS},"
     analysis_options+="${LOCAL_LIMIT_N_EVENTS},"
-    analysis_options+="true,"
     analysis_options+="\"${GRID_WORKING_DIR}\","
     analysis_options+="\"${grid_custom_xml}\""
 

@@ -69,21 +69,16 @@ submit_masterjob() {
         exit 1
     fi
 
-    # handle tidentity macros
-    local include_tidentity=false # temporary, while i wait for ilya to clean his storage... u_u
-    if [[ ${data_kind} == "mc" ]]; then include_tidentity=false; fi
-
     # submit jobs via aliroot
     local aliroot_command aliroot_logfile
     # -- prepare command
-    # <mode> <input_path> <production_name> <run_number> <n_dirs> <limit_n_events> <include_tidentity> <grid_working_dir> <custom_xml>
+    # <mode> <input_path> <production_name> <run_number> <n_dirs> <limit_n_events> <grid_working_dir> <custom_xml>
     aliroot_command=$(build_analysis_command "grid" \
                                              "${grid_input_dir}" \
                                              "${production_name}" \
                                              "${run_number}" \
                                              0 \
                                              0 \
-                                             ${include_tidentity} \
                                              "${grid_working_dir}" \
                                              "${local_xml}")
     log_msg "${script_name}" "${job_tag}" "executing: ${aliroot_command}"
