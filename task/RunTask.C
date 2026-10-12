@@ -15,7 +15,6 @@
 #include <AliESDtrackCuts.h>
 #include <AliMultSelectionTask.h>
 #include <AliPhysicsSelectionTask.h>
-#include <AliTaskConfigOCDB.h>
 
 #include "AliTaskEsd2Tree.h"
 
