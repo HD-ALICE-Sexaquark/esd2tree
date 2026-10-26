@@ -28,7 +28,7 @@ In addition, to use `scripts/looper/` and submit jobs to the Grid: `LOOPER_DIR`,
 
 For real data: valid `AliESDs.root` files.
 
-For monte-carlo: `AliESDs.root` + `Kinematics.root` + `galice.root` + `sim.log` files.
+For monte-carlo: `AliESDs.root` + `Kinematics.root` + `galice.root` files.
 
 ## Output
 
@@ -37,10 +37,10 @@ A file named `AnalysisResults.root`, containing:
 - `TList` "QA". Notable histograms:
    - `TH1D` Centrality
    - `TH1D` CentralityINT7
-   - `TH1D` Tracks_Bookkeeping
+   - `TH1D` Tracks_Bookkeeping (empty; booked only because downstream T2DS requires it)
    - `TH1D` PreFoundLambdas_Bookkeeping
-- `TTree` "Events" (as defined in `common/Schema_Events.hpp`). Where each row is a distinct selected event, which
-  contains vectors of:
+- `TTree` "Events" (a subset of the branches in `common/Schema_Events.hpp`; MC adds `MC_Event`, `McParticle` and the
+  `PreFoundLambda_{Neg,Pos}_McEntry` index branches). Where each row is a distinct selected event, which contains vectors
+  of:
    - `POD::Event` (as defined in `common/POD_Event.hpp`)
-   - `POD::Track` (as defined in `common/POD_Track.hpp`)
    - `POD::PreFoundLambda` (as defined in `common/POD_PreFoundLambda.hpp`)

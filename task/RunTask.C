@@ -21,7 +21,6 @@
 void RunTask(const char *Mode,            // "local", "grid"
              const char *InputPath,       // what comes before the RN
              const char *ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
-                                          // for sexa MC: "LHC23l1a3", "LHC23l1b3"
                                           // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
                                           // for hdib MC: "LHC26h"
              int RunNumber,               // single run number
@@ -39,7 +38,6 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     auto ProductionName_TStr = TString(ProductionName);
     bool IsMC = ProductionName_TStr.Contains("LHC2");  // fragile MC detection, but Run 2 finished in 2018
-    bool IsSexaMC = ProductionName_TStr.Contains("23l1");
     bool IsHdibMC = ProductionName_TStr.Contains("26h");
 
     int SplitMaxNFiles = 60;        // default for data
@@ -95,11 +93,10 @@ void RunTask(const char *Mode,            // "local", "grid"
             job_tag = gSystem->BaseName(Grid_CustomXML);  // xml files are already named <run>_<index>.xml
             job_tag.ReplaceAll(".xml", "");
         } else if (IsMC) {
-            // InputPath ends with the sim set, e.g. /alice/sim/2023/LHC23l1a3/A1.73 -> "A1.73_296690"
+            // prefixed by InputPath's last directory, e.g. ".../LHC20e3a" -> "LHC20e3a_296690"
             job_tag = Form("%s_%i", gSystem->BaseName(InputPath), RunNumber);
         } else {
             job_tag = Form("%i", RunNumber);
-            if (IsMC) job_tag += Form("_%s", gSystem->BaseName(InputPath));  // InputPath ends with the sim set, e.g. A1.73
         }
         alienHandler->SetJobTag(job_tag);
         alienHandler->SetGridWorkingDir(Grid_WorkingDir);
@@ -194,7 +191,7 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     gInterpreter->LoadMacro("AliTaskEsd2Tree.cxx++g");
 
-    TString TaskEsd2Tree_Options = Form("(%i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC);
+    TString TaskEsd2Tree_Options = Form("(%i, %i)", (int)IsMC, (int)IsHdibMC);
     AliTaskEsd2Tree *TaskEsd2Tree = reinterpret_cast<AliTaskEsd2Tree *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
     if (TaskEsd2Tree == nullptr) return;

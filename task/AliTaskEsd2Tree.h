@@ -1,6 +1,6 @@
 #pragma once
 
-#include <array>
+#include <cmath>
 #include <cstddef>
 #include <memory>
 #include <vector>
@@ -17,10 +17,8 @@
 #include "AliTaskEsd2Tree_LinkDef.h"
 
 class TClass;
-class TBits;
 class TList;
 class TFile;
-class TGrid;
 class TH1F;
 class TObjArray;
 class TObjString;
@@ -35,7 +33,8 @@ class AliPIDResponse;
 
 class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
-    enum ETrack {  // PENDING to sort when cuts defined
+    // NOTE: no tracks are stored; kept only to book `Tracks_Bookkeeping` (left empty) with the same bins, which T2DS requires
+    enum ETrack {
         kAllTracks,
         kValidStatusTPC_1,
         kValidStatusTPC_2,
@@ -82,7 +81,7 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     ~AliTaskEsd2Tree();
 
     // Settings ~ stored in Analysis Manager //
-    void Initialize(bool is_mc, bool is_sexa_mc = false, bool is_hdib_mc = false);
+    void Initialize(bool is_mc, bool is_hdib_mc = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
@@ -96,22 +95,12 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     // MC Particles //
     void ProcessMCParticles();
 
-    // Tracks //
-    void ProcessTracks();
-
     // (Anti)Lambdas //
     void ProcessPreFoundLambdas();
-
-    // Injected Reactions //
-    void ProcessInjectedReactions();
-    bool ReadSignalLogs(const TString& sim_sub_set);
 
     // Utilities //
     Common::ECustomGeneratorIdx GetCustomGeneratorIndex(const AliMCParticle* mc) const {
         short orig_gen_idx = mc->GetGeneratorIndex();
-        if (fIsMC_DedicatedSexaquark) {
-            return static_cast<Common::ECustomGeneratorIdx>(orig_gen_idx);
-        }
         if (fIsMC_DedicatedHdibaryon) {
             if (orig_gen_idx < 6)
                 return Common::ECustomGeneratorIdx::kInjectedAuxCharged;
@@ -120,21 +109,14 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
         }
         return Common::kHijing;  // valid for general-purpose MC
     }
-    static int GetFirstRow(const TBits& map) {
-        int firstRow = -1;  // default value
-        for (int i = 0; i < 159; ++i) {
-            if (map.TestBitNumber(i)) {
-                firstRow = i;
-                break;
-            }
-        }
-        return firstRow;
+    // Distance in (pt, pz) between a momentum and a track parametrization; both are constant along a helix.
+    static double GetMomentumMismatch(const double* momentum, const AliExternalTrackParam& param) {
+        return std::hypot(std::hypot(momentum[0], momentum[1]) - param.Pt(), momentum[2] - param.Pz());
     }
 
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
     bool fIsMC;                     // kTRUE if MC simulation, kFALSE if data
-    bool fIsMC_DedicatedSexaquark;  // kTRUE to read and load signal logs
     bool fIsMC_DedicatedHdibaryon;  //
 
     // AliRoot Objects //
@@ -144,16 +126,6 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     const AliESDVertex* fPrimaryVertex;   //! primary vertex
     AliPIDResponse* fPIDResponse;         //! pid response object
     AliEventCuts fEventCuts;              //! event cuts
-
-    // Signal Logs //
-    TString fAliEnPath;                                                                                             //! loaded in `UserNotify()`
-    std::array<std::array<int, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_ReactionID;      //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Px;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Py;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Sexaquark_Pz;  //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Px;    //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Py;    //!
-    std::array<std::array<float, E2T::NSexaReactionsPerEvent>, E2T::NEventsInDedicatedMCFile> fEvVec_Nucleon_Pz;    //!
 
     // Output //
 
@@ -169,5 +141,5 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     Schema::Events fOutput;                               //!
     std::unique_ptr<Framework::TeeTree::Writer> fWriter;  //!
 
-    ClassDef(AliTaskEsd2Tree, 2);
+    ClassDef(AliTaskEsd2Tree, 3);
 };

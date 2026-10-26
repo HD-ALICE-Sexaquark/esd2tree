@@ -1,14 +1,10 @@
-#include <fstream>
 #include <memory>
-#include <sstream>
-#include <string>
+#include <utility>
 
 #include <TChain.h>
 #include <TFile.h>
-#include <TGrid.h>
 #include <TList.h>
 #include <TObjString.h>
-#include <TSystem.h>
 
 #include <Math/Point3D.h>
 #include <Math/Vector4D.h>
@@ -40,7 +36,6 @@ AliTaskEsd2Tree::AliTaskEsd2Tree()
     : AliAnalysisTaskSE{},
       //
       fIsMC{false},
-      fIsMC_DedicatedSexaquark{false},
       fIsMC_DedicatedHdibaryon{false},
       //
       fMC{nullptr},
@@ -48,16 +43,6 @@ AliTaskEsd2Tree::AliTaskEsd2Tree()
       fESD{nullptr},
       fPrimaryVertex{nullptr},
       fPIDResponse{nullptr},
-      //
-      fAliEnPath{""},
-      //
-      fEvVec_ReactionID{},
-      fEvVec_Sexaquark_Px{},
-      fEvVec_Sexaquark_Py{},
-      fEvVec_Sexaquark_Pz{},
-      fEvVec_Nucleon_Px{},
-      fEvVec_Nucleon_Py{},
-      fEvVec_Nucleon_Pz{},
       //
       fOutputList{nullptr},
       fHist_Centrality{nullptr},
@@ -74,7 +59,6 @@ AliTaskEsd2Tree::AliTaskEsd2Tree(const char *name)
     : AliAnalysisTaskSE{name},
       //
       fIsMC{false},
-      fIsMC_DedicatedSexaquark{false},
       fIsMC_DedicatedHdibaryon{false},
       //
       fMC{nullptr},
@@ -82,16 +66,6 @@ AliTaskEsd2Tree::AliTaskEsd2Tree(const char *name)
       fESD{nullptr},
       fPrimaryVertex{nullptr},
       fPIDResponse{nullptr},
-      //
-      fAliEnPath{""},
-      //
-      fEvVec_ReactionID{},
-      fEvVec_Sexaquark_Px{},
-      fEvVec_Sexaquark_Py{},
-      fEvVec_Sexaquark_Pz{},
-      fEvVec_Nucleon_Px{},
-      fEvVec_Nucleon_Py{},
-      fEvVec_Nucleon_Pz{},
       //
       fOutputList{nullptr},
       fHist_Centrality{nullptr},
@@ -114,16 +88,14 @@ AliTaskEsd2Tree::~AliTaskEsd2Tree() {
 }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Tree.C` macro.
-void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_sexa_mc, bool is_hdib_mc) {
+void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_hdib_mc) {
     fIsMC = is_mc;
-    fIsMC_DedicatedSexaquark = is_sexa_mc;
     fIsMC_DedicatedHdibaryon = is_hdib_mc;
     // print settings //
     AliInfo("Initializing...");
     AliInfo("Settings:");
     AliInfo("========");
     AliInfoF(">> IsMC                    = %i", fIsMC);
-    AliInfoF(">> IsMC_DedicatedSexaquark = %i", fIsMC_DedicatedSexaquark);
     AliInfoF(">> IsMC_DedicatedHdibaryon = %i", fIsMC_DedicatedHdibaryon);
 }
 
@@ -142,8 +114,19 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
 
     // Prepare output TTree //
 
+    // NOTE: only the branches that T2DS `verify` reads -- a subset of `Schema::Events::CreateModel_TeeTree()`, same names and types
+    Framework::TeeTree::Model model;
+    model.RegisterBranch<POD::Event>(&fOutput.Event, "Event");
+    model.RegisterBranch<std::vector<POD::PreFoundLambda>>(&fOutput.PreFoundLambda, "PreFoundLambda");
+    if (fIsMC) {
+        model.RegisterBranch<POD::MC::Event>(&fOutput.MC_Event, "MC_Event");
+        model.RegisterBranch<std::vector<POD::McParticle>>(&fOutput.McParticle, "McParticle");
+        model.RegisterBranch<std::vector<unsigned int>>(&fOutput.PreFoundLambda_Neg_McEntry, "PreFoundLambda_Neg_McEntry");
+        model.RegisterBranch<std::vector<unsigned int>>(&fOutput.PreFoundLambda_Pos_McEntry, "PreFoundLambda_Pos_McEntry");
+    }
+
     OpenFile(2)->SetCompressionLevel(9);
-    fWriter = std::make_unique<Framework::TeeTree::Writer>(fOutput.CreateModel_TeeTree(fIsMC, fIsMC_DedicatedSexaquark), E2T::Name_OutputTree);
+    fWriter = std::make_unique<Framework::TeeTree::Writer>(std::move(model), E2T::Name_OutputTree);
     fOutputTree = fWriter->GetTree();
 
     // Prepare output list and histograms //
@@ -161,6 +144,7 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     TAxis *x_axis = nullptr;
 
     // -- tracks bookkeeping
+    // NOTE: never filled, because tracks aren't stored; booked only because T2DS requires it, with the same bins and labels
     fHist_Tracks_Bookkeeping = new TH1F("Tracks_Bookkeeping", ";;Counts", ETrack::kNTrackCuts, 0., static_cast<double>(ETrack::kNTrackCuts));
     x_axis = fHist_Tracks_Bookkeeping->GetXaxis();
     x_axis->SetBinLabel(ETrack::kAllTracks + 1, "AllTracks");
@@ -226,11 +210,11 @@ bool AliTaskEsd2Tree::UserNotify() {
 
     // get AliEn path and tokenize it //
 
-    fAliEnPath = man_file->GetName();
-    if (fAliEnPath == "") AliWarning("fAliEnPath couldn't be found.");
-    AliInfoF("fAliEnPath = %s", fAliEnPath.Data());
+    TString alien_path = man_file->GetName();
+    if (alien_path == "") AliWarning("alien_path couldn't be found.");
+    AliInfoF("alien_path = %s", alien_path.Data());
 
-    TObjArray *tokens = fAliEnPath.Tokenize("/");
+    TObjArray *tokens = alien_path.Tokenize("/");
     int tokens_n_entries = tokens->GetEntries();
     if (tokens_n_entries < 4) {
         delete tokens;
@@ -239,19 +223,12 @@ bool AliTaskEsd2Tree::UserNotify() {
     if (fIsMC) {
         // NOTES:
         // - path of gen. purp. MC ends with format `.../297595/001/AliESDs.root`
-        // - path of signal MC ends with format `.../A1.73/297595/001/AliESDs.root`
+        // - path of h-dibaryon MC ends with format `.../signal/297595/001/AliESDs.root`
         fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 3)))->GetString().Atoi();
         fOutput.Event.DirNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 2)))->GetString().Atoi();
         fOutput.Event.DirNumberB = 0;                                              // non-existent in MC
         AliInfoF("Run Number = %i", static_cast<int>(fOutput.Event.RunNumber));    // = 297595
         AliInfoF("Dir Number = %03i", static_cast<int>(fOutput.Event.DirNumber));  // = 001
-        if (fIsMC_DedicatedSexaquark) {
-            TString SimSubSet = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 4)))->GetString();
-            if (!ReadSignalLogs(SimSubSet)) {
-                delete tokens;
-                return false;
-            }
-        }
     } else {
         // NOTE: path of real data ends with format `.../LHC15o/000245232/pass2/15000245232039.914/AliESDs.root`
         fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 4)))->GetString().Atoi();
@@ -290,14 +267,7 @@ void AliTaskEsd2Tree::UserExec(Option_t *option) {
 
     // mc particles //
 
-    if (fIsMC) {
-        if (fIsMC_DedicatedSexaquark) ProcessInjectedReactions();
-        ProcessMCParticles();
-    }
-
-    // tracks //
-
-    ProcessTracks();
+    if (fIsMC) ProcessMCParticles();
 
     // (anti)lambdas //
 
@@ -306,7 +276,7 @@ void AliTaskEsd2Tree::UserExec(Option_t *option) {
     // end of event //
 
     fWriter->Fill();
-    fOutput.Clear(fIsMC, fIsMC_DedicatedSexaquark);
+    fOutput.Clear(fIsMC, false);
 
     // post data //
 
@@ -434,7 +404,7 @@ void AliTaskEsd2Tree::ProcessMCParticles() {
         new_mc.IsSecFromMat = mcPart->IsSecondaryFromMaterial();
         new_mc.IsSecFromWeak = mcPart->IsSecondaryFromWeakDecay();
 #if E2T_VERBOSE
-        if (mcPart->GetGeneratorIndex() == 2) {
+        if (new_mc.Generator == Common::kInjectedHdibaryon) {
             AliInfoF("mc_entry=%i,mc_pdg=%i,mc_is_physprim=%i,mc_status=%i,mother_entry=%i",  //
                      mc_entry, mcPart->PdgCode(), mcPart->IsPhysicalPrimary(), mcPart->MCStatusCode(), mcPart->GetMother());
         }
@@ -448,152 +418,6 @@ void AliTaskEsd2Tree::ProcessMCParticles() {
     }  // end of loop over MC particles
 }
 
-// # Reconstructed # //
-
-// Loop over the reconstructed tracks in a single event.
-void AliTaskEsd2Tree::ProcessTracks() {
-
-    // vector preallocation //
-    const int n_tracks = fESD->GetNumberOfTracks();
-    const int n_mc = fIsMC ? fMC->GetNumberOfTracks() : 0;
-    fOutput.Track.reserve(n_tracks);
-    if (fIsMC) fOutput.Track_McEntry.reserve(n_tracks);
-
-    // allocate c-arrays //
-    double position[3]{};
-    double momentum[3]{};
-    double cov_xyz_pxpypz[Common::NCovMatrixComponents_State6]{};
-    float pre_dca[2]{};
-    float pre_dca_cov[3]{};
-
-    // read tracks //
-    for (int esd_entry = 0; esd_entry < n_tracks; ++esd_entry) {
-        auto *esd_track = fESD->GetTrack(esd_entry);
-        if (esd_track == nullptr) continue;
-
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kAllTracks);
-
-        // track selection //
-
-        // tpc status (1)
-        auto status = esd_track->GetStatus();
-        bool tpc_in = (status & AliESDtrack::kTPCin) > 0;
-        bool tpc_refit = (status & AliESDtrack::kTPCrefit) > 0;
-        if (!tpc_in || !tpc_refit) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kValidStatusTPC_1);
-
-        // tpc status (2)
-        const auto *inner_param = esd_track->GetInnerParam();
-        if (inner_param == nullptr) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kValidStatusTPC_2);
-
-        // its status -- equivalent to counting n hits on its
-        bool its_in = (status & AliESDtrack::kITSin) > 0;
-        if (its_in) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kNoHitInITS);
-
-        // pre-calc. dca w.r.t pv
-        esd_track->GetImpactParameters(pre_dca, pre_dca_cov);
-        float pre_dca_xy = std::abs(pre_dca[0]);
-        float pre_dca_z = std::abs(pre_dca[1]);
-        if (pre_dca_xy < E2T::Cuts::Track::Min_PreDCAxy) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAxy);
-        if (pre_dca_xy > E2T::Cuts::Track::Max_PreDCAxy) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAxy);
-        if (pre_dca_z < E2T::Cuts::Track::Min_PreDCAz) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAz);
-        if (pre_dca_z > E2T::Cuts::Track::Max_PreDCAz) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAz);
-
-        // max |pz|
-        if (std::abs(inner_param->Pz()) > E2T::Cuts::Track::AbsMax_Pz) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesAbsMaxPz);
-
-        // min pt
-        if (inner_param->Pt() < E2T::Cuts::Track::Min_Pt) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPt);
-
-        // max pt
-        if (inner_param->Pt() > E2T::Cuts::Track::Max_Pt) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPt);
-
-        // max |eta|
-        if (std::abs(inner_param->Eta()) > E2T::Cuts::Track::AbsMax_Eta) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesAbsMaxEta);
-
-        // n clusters
-        // NOTE: `Min_TPC_NClusters` is currently 0, so the explicit zero test below is what protects the division, not the cut
-        auto tpc_n_clusters = esd_track->GetTPCNcls();
-        if (tpc_n_clusters == 0 || tpc_n_clusters < E2T::Cuts::Track::Min_TPC_NClusters) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinNTPCClusters);
-
-        // chi2 / nclusters
-        auto tpc_chi2_ncls = esd_track->GetTPCchi2() / static_cast<double>(tpc_n_clusters);
-        if (tpc_chi2_ncls > E2T::Cuts::Track::Max_TPC_Chi2_NClusters) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesChi2NClusters);
-
-        // kink rejection
-        if (esd_track->GetKinkIndex(0) > 0) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kNotAKink);
-
-        // pid (1)
-        // NOTE: turned off the cut (was the most expensive), because it fails in 18q, but kept the bookkeeping hist for merging purposes
-        // auto pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, esd_track);
-        // if (pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kHasValidPid);
-
-        // pid (2) -- these functions include corrections (when RD) + tuning on data (when MC)
-        // NOTE: they must run before `GetTPCsignalTunedOnData()` below, which they are what populates
-        float n_sigmas_p = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kProton);
-        float n_sigmas_k = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kKaon);
-        float n_sigmas_pi = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kPion);
-        if (std::abs(n_sigmas_p) > E2T::Cuts::Track::AbsMax_NSigmas_PID && std::abs(n_sigmas_k) > E2T::Cuts::Track::AbsMax_NSigmas_PID &&
-            std::abs(n_sigmas_pi) > E2T::Cuts::Track::AbsMax_NSigmas_PID) {
-            continue;  // apply cut
-        }
-        fHist_Tracks_Bookkeeping->Fill(ETrack::kPidWithinRange);
-
-        // create new //
-        POD::Track new_track;  // non-initialized on purpose
-        new_track.EsdEntry = static_cast<unsigned int>(esd_entry);
-        inner_param->GetXYZ(position);
-        new_track.X = static_cast<float>(position[0]);
-        new_track.Y = static_cast<float>(position[1]);
-        new_track.Z = static_cast<float>(position[2]);
-        inner_param->GetPxPyPz(momentum);
-        new_track.Px = static_cast<float>(momentum[0]);
-        new_track.Py = static_cast<float>(momentum[1]);
-        new_track.Pz = static_cast<float>(momentum[2]);
-        // -- dca
-        new_track.PreDCAxy = pre_dca_xy;
-        new_track.PreDCAz = pre_dca_z;
-        // -- pid; for RD, it includes corrections; for MC, this is the correct way
-        new_track.TPC_Signal = fIsMC ? static_cast<float>(esd_track->GetTPCsignalTunedOnData()) : static_cast<float>(esd_track->GetTPCsignal());
-        new_track.NSigmasPion = n_sigmas_pi;
-        new_track.NSigmasKaon = n_sigmas_k;
-        new_track.NSigmasProton = n_sigmas_p;
-        // -- cov. matrix
-        inner_param->GetCovarianceXYZPxPyPz(cov_xyz_pxpypz);
-        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
-            new_track.CovMatrix[idx_cov] = static_cast<float>(cov_xyz_pxpypz[idx_cov]);
-        }
-        new_track.TPC_FirstRow = GetFirstRow(esd_track->GetTPCClusterMap());
-        // -- extra tpc branches
-        new_track.TPC_NCrossedRows = esd_track->GetTPCCrossedRows();
-        new_track.TPC_NClusters = tpc_n_clusters;
-        new_track.TPC_NClustersFindable = esd_track->GetTPCNclsF();
-        new_track.TPC_Chi2 = static_cast<float>(esd_track->GetTPCchi2());
-        // -- charge
-        new_track.Charge = esd_track->Charge();
-
-        // push reconstructed //
-        fOutput.Track.emplace_back(new_track);
-
-        // push mc info //
-        if (fIsMC) fOutput.Track_McEntry.emplace_back(std::abs(esd_track->GetLabel()));
-    }  // end of loop over tracks
-}
-
 // # Lambdas # //
 
 void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
@@ -601,7 +425,6 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
     // vector preallocation //
     const int n_v0s = fESD->GetNumberOfV0s();
     const int n_tracks = fESD->GetNumberOfTracks();
-    const int n_mc = fIsMC ? fMC->GetNumberOfTracks() : 0;
     fOutput.PreFoundLambda.reserve(n_v0s);
     if (fIsMC) {
         fOutput.PreFoundLambda_Neg_McEntry.reserve(n_v0s);
@@ -615,14 +438,14 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
     double neg_cov_xyz_pxpypz[Common::NCovMatrixComponents_State6]{};
     float neg_dca[2]{};
     float neg_cov_dca[3]{};
-    double neg_px, neg_py, neg_pz;
+    double neg_momentum_pca[3]{};
     // -- positive daughter
     double pos_position[3]{};
     double pos_momentum[3]{};
     double pos_cov_xyz_pxpypz[Common::NCovMatrixComponents_State6]{};
     float pos_dca[2]{};
     float pos_cov_dca[3]{};
-    double pos_px, pos_py, pos_pz;
+    double pos_momentum_pca[3]{};
 
     // auxiliary vars //
     const ROOT::Math::XYZPoint pv{fPrimaryVertex->GetX(), fPrimaryVertex->GetY(), fPrimaryVertex->GetZ()};
@@ -668,29 +491,30 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         if (Common::Math::CosinePointingAngle(mom_v0, dv_v0, pv) < E2T::Cuts::PreFoundLambda::Min_CPA_wrt_PV) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesCPAwrtPV);
 
-        // daughter tracks
+        // daughter params
+        // NOTE: the on-the-fly finder fills the N slot with the daughter of lower ESD index, whatever its charge; since AliRoot v5-09-30,
+        //       the `AliESDv0` copy constructor swaps params and indices by the params' charge. Order them here too, for any reco. version,
+        //       always keeping each param with its own index.
+        const AliExternalTrackParam *neg_param = v0->GetParamN();
+        const AliExternalTrackParam *pos_param = v0->GetParamP();
         int neg_index = v0->GetNindex();
         int pos_index = v0->GetPindex();
-        if (neg_index < 0 || neg_index >= n_tracks || pos_index < 0 || pos_index >= n_tracks) continue;
-        auto *neg_track_v1 = fESD->GetTrack(neg_index);
-        auto *pos_track_v1 = fESD->GetTrack(pos_index);
-        if (neg_track_v1 == nullptr || pos_track_v1 == nullptr) continue;
+        if (neg_param->Charge() > 0) {
+            std::swap(neg_param, pos_param);
+            std::swap(neg_index, pos_index);
+        }
         // daughters must have opposite charges
-        if (neg_track_v1->Charge() * pos_track_v1->Charge() >= 0) continue;
-        // quickly confirm their charges
-        AliESDtrack *neg_track = neg_track_v1;
-        if (pos_track_v1->Charge() < 0) {
-            neg_track = pos_track_v1;
-            neg_index = v0->GetPindex();
-        }
-        AliESDtrack *pos_track = pos_track_v1;
-        if (neg_track_v1->Charge() > 0) {
-            pos_track = neg_track_v1;
-            pos_index = v0->GetNindex();
-        }
+        if (neg_param->Charge() > 0 || pos_param->Charge() < 0) continue;
+        // daughter tracks
+        if (neg_index < 0 || neg_index >= n_tracks || pos_index < 0 || pos_index >= n_tracks) continue;
+        auto *neg_track = fESD->GetTrack(neg_index);
+        auto *pos_track = fESD->GetTrack(pos_index);
+        if (neg_track == nullptr || pos_track == nullptr) continue;
+        // their final charges must agree with their params' -- drops the rare v0 whose daughters both flipped charge after the finder
+        if (neg_track->Charge() >= 0 || pos_track->Charge() <= 0) continue;
 
         // negative daughter's pid
-        // as in `ProcessTracks()`, turned off; expensive + doesn't work for 18q; kept hist bin
+        // turned off; expensive + doesn't work for 18q; kept hist bin
         // auto neg_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, neg_track);
         // if (neg_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kNegDaughterHasValidPid);
@@ -699,7 +523,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         float neg_n_sigmas_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kPion);
 
         // positive daughter's pid
-        // as in `ProcessTracks()`, turned off; expensive + doesn't work for 18q; kept hist bin
+        // turned off; expensive + doesn't work for 18q; kept hist bin
         // auto pos_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, pos_track);
         // if (pos_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPosDaughterHasValidPid);
@@ -734,16 +558,21 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
 
         // invariant mass
         // -- get daughter's momenta @ pca w.r.t. v0
-        v0->GetNPxPyPz(neg_px, neg_py, neg_pz);
-        v0->GetPPxPyPz(pos_px, pos_py, pos_pz);
+        // NOTE: AliRoot's copy constructor doesn't swap these, so they can be stale until a v0 refit recomputes them. Give each daughter the
+        //       one whose (pt, pz) matches its param: the params aren't at the pca, but both are constant along a helix.
+        v0->GetNPxPyPz(neg_momentum_pca[0], neg_momentum_pca[1], neg_momentum_pca[2]);
+        v0->GetPPxPyPz(pos_momentum_pca[0], pos_momentum_pca[1], pos_momentum_pca[2]);
+        if (GetMomentumMismatch(neg_momentum_pca, *neg_param) > GetMomentumMismatch(neg_momentum_pca, *pos_param)) {
+            std::swap(neg_momentum_pca, pos_momentum_pca);
+        }
         // -- anti-lambda hypothesis
-        lv_antiproton.SetCoordinates(neg_px, neg_py, neg_pz, Common::PdgMass_Proton);
-        lv_piplus.SetCoordinates(pos_px, pos_py, pos_pz, Common::PdgMass_Pion);
+        lv_antiproton.SetCoordinates(neg_momentum_pca[0], neg_momentum_pca[1], neg_momentum_pca[2], Common::PdgMass_Proton);
+        lv_piplus.SetCoordinates(pos_momentum_pca[0], pos_momentum_pca[1], pos_momentum_pca[2], Common::PdgMass_Pion);
         double m_antilambda = (lv_antiproton + lv_piplus).M();
         double delta_m_antilambda = std::abs(m_antilambda - Common::PdgMass_Lambda);
         // -- lambda hypothesis
-        lv_proton.SetCoordinates(pos_px, pos_py, pos_pz, Common::PdgMass_Proton);
-        lv_piminus.SetCoordinates(neg_px, neg_py, neg_pz, Common::PdgMass_Pion);
+        lv_proton.SetCoordinates(pos_momentum_pca[0], pos_momentum_pca[1], pos_momentum_pca[2], Common::PdgMass_Proton);
+        lv_piminus.SetCoordinates(neg_momentum_pca[0], neg_momentum_pca[1], neg_momentum_pca[2], Common::PdgMass_Pion);
         double m_lambda = (lv_proton + lv_piminus).M();
         double delta_m_lambda = std::abs(m_lambda - Common::PdgMass_Lambda);
         // NOTE: the mass hypothesis must agree with the pid hypothesis, otherwise a candidate that is a lambda only by pid and an
@@ -754,6 +583,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesInvariantMass);
 
         // armenteros-podolanski variables
+        // NOTE: stale momenta flip the sign of alpha, but neither |alpha| nor qt depend on which slot holds which momentum
         double arm_alpha = v0->AlphaV0();
         double arm_qt = v0->PtArmV0();
         if (arm_qt > E2T::Cuts::PreFoundLambda::AbsSlope_ArmQtOverArmAlpha * std::abs(arm_alpha)) continue;  // apply cut
@@ -761,14 +591,13 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
 
 #if E2T_VERBOSE
         AliInfoF("id_v0=%i, id_neg=%i, id_pos=%i, delta_mass_as_l=%f, delta_mass_as_al=%f",  //
-                 entry_v0, v0->GetNindex(), v0->GetPindex(), delta_m_lambda, delta_m_antilambda);
+                 entry_v0, neg_index, pos_index, delta_m_lambda, delta_m_antilambda);
 #endif
 
         // passed pre-selection, get some more properties //
 
         // negative daughter
         // -- state + cov. matrix
-        const auto *neg_param = v0->GetParamN();
         neg_param->GetXYZ(neg_position);
         neg_param->GetPxPyPz(neg_momentum);
         neg_param->GetCovarianceXYZPxPyPz(neg_cov_xyz_pxpypz);
@@ -779,7 +608,6 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
 
         // positive daughter
         // -- state + cov. matrix
-        const auto *pos_param = v0->GetParamP();
         pos_param->GetXYZ(pos_position);
         pos_param->GetPxPyPz(pos_momentum);
         pos_param->GetCovarianceXYZPxPyPz(pos_cov_xyz_pxpypz);
@@ -808,9 +636,9 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Neg_NSigmasKaon = neg_n_sigmas_kaon;
         new_lambda.Neg_NSigmasPion = neg_n_sigmas_pion;
         // -- related to (anti)lambda
-        new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_px);
-        new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_py);
-        new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_pz);
+        new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_momentum_pca[0]);
+        new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_momentum_pca[1]);
+        new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_momentum_pca[2]);
         new_lambda.Neg_TPC_NCrossedRows = neg_track->GetTPCCrossedRows();
         new_lambda.Neg_TPC_NClusters = neg_track->GetTPCNcls();
         new_lambda.Neg_TPC_NClustersFindable = neg_track->GetTPCNclsF();
@@ -829,9 +657,9 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Pos_NSigmasKaon = pos_n_sigmas_kaon;
         new_lambda.Pos_NSigmasPion = pos_n_sigmas_pion;
         // -- related to (anti)lambda
-        new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_px);
-        new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_py);
-        new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_pz);
+        new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_momentum_pca[0]);
+        new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_momentum_pca[1]);
+        new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_momentum_pca[2]);
         new_lambda.Pos_TPC_NCrossedRows = pos_track->GetTPCCrossedRows();
         new_lambda.Pos_TPC_NClusters = pos_track->GetTPCNcls();
         new_lambda.Pos_TPC_NClustersFindable = pos_track->GetTPCNclsF();
@@ -846,135 +674,4 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
             fOutput.PreFoundLambda_Pos_McEntry.emplace_back(std::abs(pos_track->GetLabel()));
         }
     }
-}
-
-// # Injected Reactions # //
-
-// Store the in-memory values into the tree branches.
-void AliTaskEsd2Tree::ProcessInjectedReactions() {
-    if (fOutput.Event.EventNumber >= E2T::NEventsInDedicatedMCFile) {
-        AliWarning("Invalid EventNumber to read signal logs.");
-        return;
-    }
-    fOutput.InjectedSexa.reserve(E2T::NSexaReactionsPerEvent);  // vector preallocation
-    for (int r = 0; r < E2T::NSexaReactionsPerEvent; ++r) {
-        fOutput.InjectedSexa.emplace_back(fEvVec_ReactionID[fOutput.Event.EventNumber][r],    //
-                                          fEvVec_Sexaquark_Px[fOutput.Event.EventNumber][r],  //
-                                          fEvVec_Sexaquark_Py[fOutput.Event.EventNumber][r],  //
-                                          fEvVec_Sexaquark_Pz[fOutput.Event.EventNumber][r],  //
-                                          fEvVec_Nucleon_Px[fOutput.Event.EventNumber][r],    //
-                                          fEvVec_Nucleon_Py[fOutput.Event.EventNumber][r],    //
-                                          fEvVec_Nucleon_Pz[fOutput.Event.EventNumber][r]);
-    }
-}
-
-// Copy to working directory the respective `sim.log` that corresponds to the `RunNumber+DirNumber` that's being analyzed.
-// Read the anti-sexaquark and struck nucleon kinematics for each injected reaction from the `sim.log` file that corresponds to an entire dir number
-// into memory.
-bool AliTaskEsd2Tree::ReadSignalLogs(const TString &sim_sub_set) {
-
-    // (1) Clear signal cache //
-
-    fEvVec_ReactionID = {};
-    fEvVec_Sexaquark_Px = {};
-    fEvVec_Sexaquark_Py = {};
-    fEvVec_Sexaquark_Pz = {};
-    fEvVec_Nucleon_Px = {};
-    fEvVec_Nucleon_Py = {};
-    fEvVec_Nucleon_Pz = {};
-
-    // (2) Bring Signal Logs //
-
-    TString AliEn_Dir = fAliEnPath(0, fAliEnPath.Last('/'));
-
-    TString orig_path = Form("%s/sim.log", AliEn_Dir.Data());
-    TString new_path = orig_path;
-
-    if (gGrid == nullptr) {
-        // in local mode, try to copy the file
-        AliInfoF("Copying file %s ...", orig_path.Data());
-
-        TString SignalLog_NewBasename =
-            Form("sim_%s_%i_%03i.log", sim_sub_set.Data(), fOutput.Event.RunNumber, static_cast<int>(fOutput.Event.DirNumber));
-
-        bool copy_succesful = false;
-        if (AliEn_Dir.BeginsWith("alien://")) {
-            if (TGrid::Connect("alien://") == nullptr) return false;
-            copy_succesful = TFile::Cp(Form("%s", orig_path.Data()), Form("file://./%s", SignalLog_NewBasename.Data()));
-        } else {
-            copy_succesful = gSystem->CopyFile(Form("%s", orig_path.Data()), Form("./%s", SignalLog_NewBasename.Data()), true) == 0;
-        }
-        if (!copy_succesful) return false;
-
-        new_path = Form("%s/%s", gSystem->pwd(), SignalLog_NewBasename.Data());
-    } else {
-        // grid mode, bring archive to node dir and unzip file
-        TFile::Cp(Form("%s/log_archive", AliEn_Dir.Data()), "file:./log_archive.zip");
-        gSystem->Exec("unzip -o -q log_archive.zip sim.log");
-        new_path = "sim.log";
-    }
-
-    // (3) Read signal logs //
-
-    AliInfoF("Opening file %s ...", new_path.Data());
-
-    std::ifstream SimLogFile(new_path);
-    if (!SimLogFile.is_open()) {
-        AliWarningF("Unable to open file %s", new_path.Data());
-        return false;
-    }
-
-    int event_n = -1;
-    int react_id = 0;
-
-    std::string line;
-    while (std::getline(SimLogFile, line)) {
-
-        // -- a new event has appeared!
-        if (line.rfind(E2T::SimLog_EventHeader, 0) == 0) {
-            ++event_n;
-            react_id = 0;
-            continue;
-        }
-
-        // -- small protection
-        if (event_n < 0) continue;
-        if (line.rfind(E2T::SimLog_ReactionMarker, 0) != 0) continue;
-        if (event_n >= static_cast<int>(E2T::NEventsInDedicatedMCFile) || react_id >= static_cast<int>(E2T::NSexaReactionsPerEvent)) {
-            AliWarningF("sim.log exceeds expected events/reactions (event %i, reaction %i), skipping", event_n, react_id);
-            continue;
-        }
-
-        std::string data_part = line.substr(E2T::SimLog_ReactionMarker.length() + 1);
-        std::stringstream ss{data_part};
-        std::string temp_parse_buffer;
-        // clang-format off
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_ReactionID[event_n][react_id] = std::stoi(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Px[event_n][react_id] = std::stof(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Py[event_n][react_id] = std::stof(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_Sexaquark_Pz[event_n][react_id] = std::stof(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Px[event_n][react_id] = std::stof(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer, ','); fEvVec_Nucleon_Py[event_n][react_id] = std::stof(temp_parse_buffer);
-        std::getline(ss, temp_parse_buffer); fEvVec_Nucleon_Pz[event_n][react_id] = std::stof(temp_parse_buffer);
-        // clang-format on
-        ++react_id;
-    }  // finish reading lines
-
-#if E2T_VERBOSE
-    for (int ev_print = 0; ev_print < E2T::NEventsInDedicatedMCFile; ++ev_print) {
-        for (int r_print = 0; r_print < E2T::NSexaReactionsPerEvent; ++r_print) {
-            std::cout << "Event " << ev_print << ", Reaction " << r_print << ":" << '\n';
-            std::cout << "  ReactionID: " << fEvVec_ReactionID[ev_print][r_print] << '\n';
-            std::cout << "  Px: " << fEvVec_Sexaquark_Px[ev_print][r_print] << ", Py: " << fEvVec_Sexaquark_Py[ev_print][r_print]
-                      << ", Pz: " << fEvVec_Sexaquark_Pz[ev_print][r_print] << '\n';
-            std::cout << "  NPx: " << fEvVec_Nucleon_Px[ev_print][r_print] << ", NPy: " << fEvVec_Nucleon_Py[ev_print][r_print]
-                      << ", NPz: " << fEvVec_Nucleon_Pz[ev_print][r_print] << '\n';
-        }
-    }
-#endif
-
-    AliInfoF("Closing file %s ...", new_path.Data());
-    SimLogFile.close();
-
-    return true;
 }
