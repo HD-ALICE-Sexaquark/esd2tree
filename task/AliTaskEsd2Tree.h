@@ -59,16 +59,14 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
         kAllPreFoundV0s,
         kOnTheFlyV0s,
         kPassesDcaV0Daughters,
-        kPassesMinPtLambda,
-        kPassesMaxPtLambda,
         kPassesMinDecayRadius2D,
         kPassesDCAwrtPV,
         kPassesCPAwrtPV,
-        kNegDaughterHasValidPid,
-        kPosDaughterHasValidPid,
+        kDaughtersHaveTPCRefit,
+        kPassesMinTPCNCrossedRowsDaughters,
+        kPassesMinTPCNCrossedRowsNClsFDaughters,
+        kPassesMaxTPCChi2NClsDaughters,
         kPassesPid,
-        kPassesMinPtDaughters,
-        kPassesMaxPtDaughters,
         kPassesAbsMaxEtaDaughters,
         kPassesInvariantMass,
         kPassesArmenterosPodolanski,
@@ -112,6 +110,12 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     // Distance in (pt, pz) between a momentum and a track parametrization; both are constant along a helix.
     static double GetMomentumMismatch(const double* momentum, const AliExternalTrackParam& param) {
         return std::hypot(std::hypot(momentum[0], momentum[1]) - param.Pt(), momentum[2] - param.Pz());
+    }
+    // Track length in the TPC active zone, from the inner param, as in PWGLF: 2 cm dead zone at the sector edges, 220 cm drift length.
+    static float GetTPCLength(const AliESDtrack& track, double magnetic_field) {
+        // NOTE: AliRoot doesn't protect against a missing inner param
+        if (track.GetInnerParam() == nullptr) return Common::DummyFloat;
+        return static_cast<float>(track.GetLengthInActiveZone(1, 2., 220., magnetic_field));
     }
 
    private:

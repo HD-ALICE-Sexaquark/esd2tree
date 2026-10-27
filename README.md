@@ -1,4 +1,4 @@
-# esd2tree
+# esd2tree_hdib
 
 **AliPhysics** analysis task `AliTaskEsd2Tree`, converts `AliESDs.root` files into derived trees.
 
@@ -39,8 +39,8 @@ A file named `AnalysisResults.root`, containing:
    - `TH1D` CentralityINT7
    - `TH1D` Tracks_Bookkeeping (empty; booked only because downstream T2DS requires it)
    - `TH1D` PreFoundLambdas_Bookkeeping
-- `TTree` "Events" (a subset of the branches in `common/Schema_Events.hpp`; MC adds `MC_Event`, `McParticle` and the
-  `PreFoundLambda_{Neg,Pos}_McEntry` index branches). Where each row is a distinct selected event, which contains vectors
-  of:
+- `TTree` "Events" (all branches of `common/Schema_Events.hpp` except `InjectedSexa`; `Track` and, in MC, `Track_McEntry`
+  are always empty). Where each row is a distinct selected event, which contains vectors of:
    - `POD::Event` (as defined in `common/POD_Event.hpp`)
+   - `POD::Track` (as defined in `common/POD_Track.hpp`), always empty
    - `POD::PreFoundLambda` (as defined in `common/POD_PreFoundLambda.hpp`)

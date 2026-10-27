@@ -114,19 +114,8 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
 
     // Prepare output TTree //
 
-    // NOTE: only the branches that T2DS `verify` reads -- a subset of `Schema::Events::CreateModel_TeeTree()`, same names and types
-    Framework::TeeTree::Model model;
-    model.RegisterBranch<POD::Event>(&fOutput.Event, "Event");
-    model.RegisterBranch<std::vector<POD::PreFoundLambda>>(&fOutput.PreFoundLambda, "PreFoundLambda");
-    if (fIsMC) {
-        model.RegisterBranch<POD::MC::Event>(&fOutput.MC_Event, "MC_Event");
-        model.RegisterBranch<std::vector<POD::McParticle>>(&fOutput.McParticle, "McParticle");
-        model.RegisterBranch<std::vector<unsigned int>>(&fOutput.PreFoundLambda_Neg_McEntry, "PreFoundLambda_Neg_McEntry");
-        model.RegisterBranch<std::vector<unsigned int>>(&fOutput.PreFoundLambda_Pos_McEntry, "PreFoundLambda_Pos_McEntry");
-    }
-
     OpenFile(2)->SetCompressionLevel(9);
-    fWriter = std::make_unique<Framework::TeeTree::Writer>(std::move(model), E2T::Name_OutputTree);
+    fWriter = std::make_unique<Framework::TeeTree::Writer>(fOutput.CreateModel_TeeTree(fIsMC, false), E2T::Name_OutputTree);
     fOutputTree = fWriter->GetTree();
 
     // Prepare output list and histograms //
@@ -144,7 +133,6 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     TAxis *x_axis = nullptr;
 
     // -- tracks bookkeeping
-    // NOTE: never filled, because tracks aren't stored; booked only because T2DS requires it, with the same bins and labels
     fHist_Tracks_Bookkeeping = new TH1F("Tracks_Bookkeeping", ";;Counts", ETrack::kNTrackCuts, 0., static_cast<double>(ETrack::kNTrackCuts));
     x_axis = fHist_Tracks_Bookkeeping->GetXaxis();
     x_axis->SetBinLabel(ETrack::kAllTracks + 1, "AllTracks");
@@ -173,16 +161,14 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     x_axis->SetBinLabel(EPreFoundLambda::kAllPreFoundV0s + 1, "AllPreFoundV0s");
     x_axis->SetBinLabel(EPreFoundLambda::kOnTheFlyV0s + 1, "OnTheFlyV0s");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesDcaV0Daughters + 1, "PassesDcaV0Daughters");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinPtLambda + 1, "PassesMinPtLambda");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxPtLambda + 1, "PassesMaxPtLambda");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesMinDecayRadius2D + 1, "PassesMinDecayRadius2D");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesDCAwrtPV + 1, "PassesDCAwrtPV");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesCPAwrtPV + 1, "PassesCPAwrtPV");
-    x_axis->SetBinLabel(EPreFoundLambda::kNegDaughterHasValidPid + 1, "NegDaughterHasValidPid");
-    x_axis->SetBinLabel(EPreFoundLambda::kPosDaughterHasValidPid + 1, "PosDaughterHasValidPid");
+    x_axis->SetBinLabel(EPreFoundLambda::kDaughtersHaveTPCRefit + 1, "DaughtersHaveTPCRefit");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinTPCNCrossedRowsDaughters + 1, "PassesMinTPCNCrossedRowsDaughters");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinTPCNCrossedRowsNClsFDaughters + 1, "PassesMinTPCNCrossedRowsNClsFDaughters");
+    x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxTPCChi2NClsDaughters + 1, "PassesMaxTPCChi2NClsDaughters");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesPid + 1, "PassesPid");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesMinPtDaughters + 1, "PassesMinPtDaughters");
-    x_axis->SetBinLabel(EPreFoundLambda::kPassesMaxPtDaughters + 1, "PassesMaxPtDaughters");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesAbsMaxEtaDaughters + 1, "PassesAbsMaxEtaDaughters");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesInvariantMass + 1, "PassesInvariantMass");
     x_axis->SetBinLabel(EPreFoundLambda::kPassesArmenterosPodolanski + 1, "PassesArmenterosPodolanski");
@@ -268,6 +254,10 @@ void AliTaskEsd2Tree::UserExec(Option_t *option) {
     // mc particles //
 
     if (fIsMC) ProcessMCParticles();
+
+    // tracks //
+
+    // NOTE: not processed, `Track` and `Track_McEntry` are written empty
 
     // (anti)lambdas //
 
@@ -448,6 +438,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
     double pos_momentum_pca[3]{};
 
     // auxiliary vars //
+    const double magnetic_field = fESD->GetMagneticField();
     const ROOT::Math::XYZPoint pv{fPrimaryVertex->GetX(), fPrimaryVertex->GetY(), fPrimaryVertex->GetZ()};
     ROOT::Math::PxPyPzMVector lv_antiproton;
     ROOT::Math::PxPyPzMVector lv_proton;
@@ -470,12 +461,6 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         // dca between daughters
         if (v0->GetDcaV0Daughters() > E2T::Cuts::PreFoundLambda::Max_DcaV0Daughters) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesDcaV0Daughters);
-
-        // transverse momentum
-        if (v0->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinPtLambda);
-        if (v0->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMaxPtLambda);
 
         // decay radius 2d
         dv_v0.SetCoordinates(v0->Xv(), v0->Yv(), v0->Zv());
@@ -513,25 +498,47 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         // their final charges must agree with their params' -- drops the rare v0 whose daughters both flipped charge after the finder
         if (neg_track->Charge() >= 0 || pos_track->Charge() <= 0) continue;
 
-        // negative daughter's pid
-        // turned off; expensive + doesn't work for 18q; kept hist bin
-        // auto neg_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, neg_track);
-        // if (neg_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kNegDaughterHasValidPid);
+        // daughters' tpc refit
+        // NOTE: not enforced by AliRoot for on-the-fly v0s, whose finder runs before the tpc refit
+        bool neg_tpc_refit = (neg_track->GetStatus() & AliESDtrack::kTPCrefit) > 0;
+        bool pos_tpc_refit = (pos_track->GetStatus() & AliESDtrack::kTPCrefit) > 0;
+        if (!neg_tpc_refit || !pos_tpc_refit) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kDaughtersHaveTPCRefit);
 
+        // daughters' tpc crossed rows
+        float neg_tpc_n_crossed_rows = neg_track->GetTPCCrossedRows();
+        float pos_tpc_n_crossed_rows = pos_track->GetTPCCrossedRows();
+        if (neg_tpc_n_crossed_rows < E2T::Cuts::PreFoundLambda::Min_TPC_NCrossedRows_Daughters) continue;  // apply cut
+        if (pos_tpc_n_crossed_rows < E2T::Cuts::PreFoundLambda::Min_TPC_NCrossedRows_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinTPCNCrossedRowsDaughters);
+
+        // daughters' tpc crossed rows over findable clusters
+        unsigned short neg_tpc_n_clusters_findable = neg_track->GetTPCNclsF();
+        unsigned short pos_tpc_n_clusters_findable = pos_track->GetTPCNclsF();
+        if (neg_tpc_n_clusters_findable == 0 || pos_tpc_n_clusters_findable == 0) continue;  // apply cut
+        double neg_tpc_n_crossed_rows_nclsf = static_cast<double>(neg_tpc_n_crossed_rows) / neg_tpc_n_clusters_findable;
+        double pos_tpc_n_crossed_rows_nclsf = static_cast<double>(pos_tpc_n_crossed_rows) / pos_tpc_n_clusters_findable;
+        if (neg_tpc_n_crossed_rows_nclsf < E2T::Cuts::PreFoundLambda::Min_TPC_NCrossedRows_NClsF_Daughters) continue;  // apply cut
+        if (pos_tpc_n_crossed_rows_nclsf < E2T::Cuts::PreFoundLambda::Min_TPC_NCrossedRows_NClsF_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinTPCNCrossedRowsNClsFDaughters);
+
+        // daughters' tpc chi2 per cluster
+        unsigned short neg_tpc_n_clusters = neg_track->GetTPCNcls();
+        unsigned short pos_tpc_n_clusters = pos_track->GetTPCNcls();
+        if (neg_tpc_n_clusters == 0 || pos_tpc_n_clusters == 0) continue;  // apply cut
+        float neg_tpc_chi2 = static_cast<float>(neg_track->GetTPCchi2());
+        float pos_tpc_chi2 = static_cast<float>(pos_track->GetTPCchi2());
+        double neg_tpc_chi2_ncls = static_cast<double>(neg_tpc_chi2) / neg_tpc_n_clusters;
+        double pos_tpc_chi2_ncls = static_cast<double>(pos_tpc_chi2) / pos_tpc_n_clusters;
+        if (neg_tpc_chi2_ncls > E2T::Cuts::PreFoundLambda::Max_TPC_Chi2_NCls_Daughters) continue;  // apply cut
+        if (pos_tpc_chi2_ncls > E2T::Cuts::PreFoundLambda::Max_TPC_Chi2_NCls_Daughters) continue;  // apply cut
+        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMaxTPCChi2NClsDaughters);
+
+        // daughters' pid
         float neg_n_sigmas_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kProton);
         float neg_n_sigmas_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kPion);
-
-        // positive daughter's pid
-        // turned off; expensive + doesn't work for 18q; kept hist bin
-        // auto pos_pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, pos_track);
-        // if (pos_pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPosDaughterHasValidPid);
-
         float pos_n_sigmas_proton = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kProton);
         float pos_n_sigmas_pion = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kPion);
-
-        // both daughters' pid
         bool neg_could_be_proton = std::abs(neg_n_sigmas_proton) < E2T::Cuts::PreFoundLambda::AbsMax_NSigmas_PID;
         bool neg_could_be_pion = std::abs(neg_n_sigmas_pion) < E2T::Cuts::PreFoundLambda::AbsMax_NSigmas_PID;
         bool pos_could_be_proton = std::abs(pos_n_sigmas_proton) < E2T::Cuts::PreFoundLambda::AbsMax_NSigmas_PID;
@@ -540,16 +547,6 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         bool could_be_anti_lambda = neg_could_be_proton && pos_could_be_pion;
         if (!could_be_anti_lambda && !could_be_lambda) continue;  // apply cut
         fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesPid);
-
-        // daughter's min pt
-        if (pos_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Daughters) continue;  // apply cut
-        if (neg_track->Pt() < E2T::Cuts::PreFoundLambda::Min_Pt_Daughters) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMinPtDaughters);
-
-        // daughter's max pt
-        if (pos_track->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt_Daughters) continue;  // apply cut
-        if (neg_track->Pt() > E2T::Cuts::PreFoundLambda::Max_Pt_Daughters) continue;  // apply cut
-        fHist_PreFoundLambdas_Bookkeeping->Fill(EPreFoundLambda::kPassesMaxPtDaughters);
 
         // daughter's pseudorapidity
         if (std::abs(pos_track->Eta()) > E2T::Cuts::PreFoundLambda::AbsMax_Eta_Daughters) continue;  // apply cut
@@ -605,6 +602,9 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         neg_track->GetImpactParameters(neg_dca, neg_cov_dca);
         // -- remaining pid as kaon
         float neg_n_sigmas_kaon = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, neg_track, AliPID::kKaon);
+        // -- tpc signal
+        // NOTE: for MC, the one tuned on data, as already drawn and cached in the track by the n sigmas calls above
+        float neg_tpc_signal = fIsMC ? fPIDResponse->GetTPCsignalTunedOnData(neg_track) : static_cast<float>(neg_track->GetTPCsignal());
 
         // positive daughter
         // -- state + cov. matrix
@@ -615,6 +615,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         pos_track->GetImpactParameters(pos_dca, pos_cov_dca);
         // -- remaining pid as kaon
         float pos_n_sigmas_kaon = fPIDResponse->NumberOfSigmas(AliPIDResponse::kTPC, pos_track, AliPID::kKaon);
+        // -- tpc signal
+        float pos_tpc_signal = fIsMC ? fPIDResponse->GetTPCsignalTunedOnData(pos_track) : static_cast<float>(pos_track->GetTPCsignal());
 
         // create new (anti)lambda candidate //
         POD::PreFoundLambda new_lambda;  // non-initialized on purpose
@@ -623,6 +625,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Decay_Y = static_cast<float>(v0->Yv());
         new_lambda.Decay_Z = static_cast<float>(v0->Zv());
         new_lambda.DcaV0Daughters = static_cast<float>(v0->GetDcaV0Daughters());
+        // NOTE: the finder sets the status to 100 if the v0 passed its likelihood/causality cuts, to 0 otherwise, and stores it either way
+        new_lambda.PassesOnFlyLikelihood = v0->GetStatus() == 100;
         // negative daughter //
         new_lambda.Neg_EsdEntry = static_cast<unsigned int>(neg_index);
         new_lambda.Neg_State = {static_cast<float>(neg_position[0]), static_cast<float>(neg_position[1]), static_cast<float>(neg_position[2]),
@@ -630,8 +634,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
             new_lambda.Neg_CovMatrix[idx_cov] = static_cast<float>(neg_cov_xyz_pxpypz[idx_cov]);
         }
-        new_lambda.Neg_PreDCAxy = std::abs(neg_dca[0]);
-        new_lambda.Neg_PreDCAz = std::abs(neg_dca[1]);
+        new_lambda.Neg_PreDCAxy = neg_dca[0];
+        new_lambda.Neg_PreDCAz = neg_dca[1];
         new_lambda.Neg_NSigmasProton = neg_n_sigmas_proton;
         new_lambda.Neg_NSigmasKaon = neg_n_sigmas_kaon;
         new_lambda.Neg_NSigmasPion = neg_n_sigmas_pion;
@@ -639,10 +643,16 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Neg_PCAwrtV0_Px = static_cast<float>(neg_momentum_pca[0]);
         new_lambda.Neg_PCAwrtV0_Py = static_cast<float>(neg_momentum_pca[1]);
         new_lambda.Neg_PCAwrtV0_Pz = static_cast<float>(neg_momentum_pca[2]);
-        new_lambda.Neg_TPC_NCrossedRows = neg_track->GetTPCCrossedRows();
-        new_lambda.Neg_TPC_NClusters = neg_track->GetTPCNcls();
-        new_lambda.Neg_TPC_NClustersFindable = neg_track->GetTPCNclsF();
-        new_lambda.Neg_TPC_Chi2 = static_cast<float>(neg_track->GetTPCchi2());
+        new_lambda.Neg_TPC_Signal = neg_tpc_signal;
+        new_lambda.Neg_TPC_NCrossedRows = neg_tpc_n_crossed_rows;
+        new_lambda.Neg_TPC_NClusters = neg_tpc_n_clusters;
+        new_lambda.Neg_TPC_NClustersFindable = neg_tpc_n_clusters_findable;
+        new_lambda.Neg_TPC_Chi2 = neg_tpc_chi2;
+        new_lambda.Neg_TPC_Length = GetTPCLength(*neg_track, magnetic_field);
+        // -- for out-of-bunch pileup rejection
+        new_lambda.Neg_ITS_Refit = (neg_track->GetStatus() & AliESDtrack::kITSrefit) > 0;
+        new_lambda.Neg_ITS_ClusterMap = neg_track->GetITSClusterMap();
+        new_lambda.Neg_TOF_BunchCrossing = neg_track->GetTOFBunchCrossing(magnetic_field);
 
         // positive daughter //
         new_lambda.Pos_EsdEntry = static_cast<unsigned int>(pos_index);
@@ -651,8 +661,8 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
             new_lambda.Pos_CovMatrix[idx_cov] = static_cast<float>(pos_cov_xyz_pxpypz[idx_cov]);
         }
-        new_lambda.Pos_PreDCAxy = std::abs(pos_dca[0]);
-        new_lambda.Pos_PreDCAz = std::abs(pos_dca[1]);
+        new_lambda.Pos_PreDCAxy = pos_dca[0];
+        new_lambda.Pos_PreDCAz = pos_dca[1];
         new_lambda.Pos_NSigmasProton = pos_n_sigmas_proton;
         new_lambda.Pos_NSigmasKaon = pos_n_sigmas_kaon;
         new_lambda.Pos_NSigmasPion = pos_n_sigmas_pion;
@@ -660,10 +670,16 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         new_lambda.Pos_PCAwrtV0_Px = static_cast<float>(pos_momentum_pca[0]);
         new_lambda.Pos_PCAwrtV0_Py = static_cast<float>(pos_momentum_pca[1]);
         new_lambda.Pos_PCAwrtV0_Pz = static_cast<float>(pos_momentum_pca[2]);
-        new_lambda.Pos_TPC_NCrossedRows = pos_track->GetTPCCrossedRows();
-        new_lambda.Pos_TPC_NClusters = pos_track->GetTPCNcls();
-        new_lambda.Pos_TPC_NClustersFindable = pos_track->GetTPCNclsF();
-        new_lambda.Pos_TPC_Chi2 = static_cast<float>(pos_track->GetTPCchi2());
+        new_lambda.Pos_TPC_Signal = pos_tpc_signal;
+        new_lambda.Pos_TPC_NCrossedRows = pos_tpc_n_crossed_rows;
+        new_lambda.Pos_TPC_NClusters = pos_tpc_n_clusters;
+        new_lambda.Pos_TPC_NClustersFindable = pos_tpc_n_clusters_findable;
+        new_lambda.Pos_TPC_Chi2 = pos_tpc_chi2;
+        new_lambda.Pos_TPC_Length = GetTPCLength(*pos_track, magnetic_field);
+        // -- for out-of-bunch pileup rejection
+        new_lambda.Pos_ITS_Refit = (pos_track->GetStatus() & AliESDtrack::kITSrefit) > 0;
+        new_lambda.Pos_ITS_ClusterMap = pos_track->GetITSClusterMap();
+        new_lambda.Pos_TOF_BunchCrossing = pos_track->GetTOFBunchCrossing(magnetic_field);
 
         // push reconstructed //
         fOutput.PreFoundLambda.emplace_back(new_lambda);
