@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# `esd2vector/scripts/farm-pi/slurm_exec.sh`
-# ==========================================
-# NOTE: don't execute this script directly, it is meant to be used by `esd2vector/scripts/farm-pi/slurm_wrapper.sh`
+# `esd2tree_hdib/scripts/farm-pi/slurm_exec.sh`
+# =============================================
+# NOTE: don't execute this script directly, it is meant to be used by `esd2tree_hdib/scripts/farm-pi/slurm_wrapper.sh`
+# NOTE: time and memory limits are an educated guess, not measured (LHC26h2 `signal`: 60 files x 20 events per job)
 
 #SBATCH --partition=main
 #SBATCH --time=2:00:00
@@ -18,28 +19,15 @@ if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"
 if [[ -z ${MODE:-} ]]; then echo "error: missing env. var. MODE"; exit 1; fi
 if [[ -z ${MAX_N_DN_DIRS:-} ]]; then echo "error: missing env. var. MAX_N_DN_DIRS"; exit 1; fi
 if [[ -z ${PRODUCTION_NAME:-} ]]; then echo "error: missing env. var. PRODUCTION_NAME"; exit 1; fi
+if [[ -z ${VARIANT:-} ]]; then echo "error: missing env. var. VARIANT"; exit 1; fi
 # -- per run number options
 if [[ -z ${RUN_NUMBERS_STR:-} ]]; then echo "error: missing env. var. RUN_NUMBERS_STR"; exit 1; fi
 # -- slurm var
 if [[ -z ${SLURM_ARRAY_TASK_ID:-} ]]; then echo "error: missing env. var. SLURM_ARRAY_TASK_ID"; exit 1; fi
 
 # define input path
-reaction_channel=""
-injected_mass=""
-if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then
-    # -- check env.
-    if [[ -z ${CHANNELS_STR:-} ]]; then echo "error: missing env. var. CHANNELS_STR"; exit 1; fi
-    if [[ -z ${MASSES_STR:-} ]]; then echo "error: missing env. var. MASSES_STR"; exit 1; fi
-    # -- get reaction channel
-    read -ra CHANNELS_ARR <<< "${CHANNELS_STR}" # string -> array (because Slurm)
-    reaction_channel=${CHANNELS_ARR[${SLURM_ARRAY_TASK_ID}]}
-    # -- get injected anti-sexaquark mass
-    read -ra MASSES_ARR <<< "${MASSES_STR}" # string -> array (because Slurm)
-    injected_mass=${MASSES_ARR[${SLURM_ARRAY_TASK_ID}]}
-    input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}/${reaction_channel}${injected_mass}
-else
-    input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}/signal
-fi
+# NOTE: `RunTask.C` takes the variant from its last directory
+input_path=${LOCAL_SIMS_DIR}/${PRODUCTION_NAME}/${VARIANT}
 
 # get run number
 read -ra RUN_NUMBERS_ARR <<< "${RUN_NUMBERS_STR}" # string -> array (because Slurm)
@@ -47,9 +35,7 @@ run_number=${RUN_NUMBERS_ARR[${SLURM_ARRAY_TASK_ID}]}
 
 # prepare output dirs
 short_prod_name=${PRODUCTION_NAME/LHC/} # remove 'LHC'
-simset_suffix=""
-if [[ ${PRODUCTION_NAME} != "LHC26h" ]]; then simset_suffix="_${reaction_channel}${injected_mass}"; fi
-simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${short_prod_name}${simset_suffix}
+simset_outdir=${E2T_ROOT_DIR}/output/${MODE}_mc_${short_prod_name}/${VARIANT}
 rn_outdir=${simset_outdir}/${run_number}
 mkdir -p "${rn_outdir}"
 

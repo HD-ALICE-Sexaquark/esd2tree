@@ -19,10 +19,10 @@
 #include "AliTaskEsd2Tree.h"
 
 void RunTask(const char *Mode,            // "local", "grid"
-             const char *InputPath,       // what comes before the RN
+             const char *InputPath,       // what comes before the RN; for hdib MC, ending in "/signal" or "/embedded"
              const char *ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
                                           // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
-                                          // for hdib MC: "LHC26h"
+                                          // for hdib MC: "LHC26h2"
              int RunNumber,               // single run number
              /* only valid when "local" */
              int Local_NDirs = 1,                 // number of subdirs~files to run
@@ -38,7 +38,15 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     auto ProductionName_TStr = TString(ProductionName);
     bool IsMC = ProductionName_TStr.Contains("LHC2");  // fragile MC detection, but Run 2 finished in 2018
-    bool IsHdibMC = ProductionName_TStr.Contains("26h");
+    bool IsHdibMC = ProductionName_TStr == "LHC26h2";
+
+    // hdib MC variant, from InputPath's last directory: "signal" (boxes + injections) or "embedded" (HIJING + injections)
+    auto HdibVariant = TString(gSystem->BaseName(InputPath));
+    if (IsHdibMC && HdibVariant != "signal" && HdibVariant != "embedded") {
+        std::cout << "ERROR !! RunTask.C !! For " << ProductionName << ", InputPath must end in \"/signal\" or \"/embedded\"" << '\n';
+        return;
+    }
+    bool IsHdibEmbeddedMC = IsHdibMC && HdibVariant == "embedded";
 
     int SplitMaxNFiles = 60;        // default for data
     if (IsMC) SplitMaxNFiles = 12;  // default for MC
@@ -191,7 +199,7 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     gInterpreter->LoadMacro("AliTaskEsd2Tree.cxx++g");
 
-    TString TaskEsd2Tree_Options = Form("(%i, %i)", (int)IsMC, (int)IsHdibMC);
+    TString TaskEsd2Tree_Options = Form("(%i, %i, %i)", (int)IsMC, (int)IsHdibMC, (int)IsHdibEmbeddedMC);
     AliTaskEsd2Tree *TaskEsd2Tree = reinterpret_cast<AliTaskEsd2Tree *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
     if (TaskEsd2Tree == nullptr) return;
@@ -220,6 +228,7 @@ void RunTask(const char *Mode,            // "local", "grid"
         if (IsMC) {
             for (int DN = 1; DN <= Local_NDirs; ++DN) {
                 FilePath = Form("%s/%i/%03i/AliESDs.root", InputPath, RunNumber, DN);
+                if (gSystem->AccessPathName(FilePath)) continue;  // e.g. dirs of failed jobs, removed after the production
                 std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
             }

@@ -21,6 +21,8 @@ For basic local usage:
 To use the bash scripts: `LOCAL_SIMS_DIR`, `LOCAL_DATA_DIR`, `E2T_ROOT_DIR`, `E2T_SCRIPTS_DIR`, `E2T_TASK_DIR`,
 `E2T_OUTPUT_DIR`, `E2T_SLURM_DIR`.
 
+To deploy to the PI server with `scripts/deploy.sh`: `E2TH_ROOT_DIR`, `PI_USER_AND_HOST`, `E2TH_AT_PI_PATH`.
+
 In addition, to use `scripts/looper/` and submit jobs to the Grid: `LOOPER_DIR`, `JALIEN_TOKEN_CERT`,
 `JALIEN_TOKEN_KEY`, `GRID_XXX_HOME_DIR`.
 

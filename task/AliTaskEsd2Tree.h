@@ -79,7 +79,7 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     ~AliTaskEsd2Tree();
 
     // Settings ~ stored in Analysis Manager //
-    void Initialize(bool is_mc, bool is_hdib_mc = false);
+    void Initialize(bool is_mc, bool is_hdib_mc = false, bool is_hdib_embedded = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
@@ -99,6 +99,14 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     // Utilities //
     Common::ECustomGeneratorIdx GetCustomGeneratorIndex(const AliMCParticle* mc) const {
         short orig_gen_idx = mc->GetGeneratorIndex();
+        // h-dibaryon MC `embedded`: HIJING (0) + injected (anti)h-dibaryons (1)
+        if (fIsMC_HdibEmbedded) {
+            if (orig_gen_idx == 0)
+                return Common::ECustomGeneratorIdx::kHijing;
+            else
+                return Common::ECustomGeneratorIdx::kInjectedHdibaryon;
+        }
+        // h-dibaryon MC `signal`: boxes of auxiliary charged primaries (0-5) + injected (anti)h-dibaryons (6)
         if (fIsMC_DedicatedHdibaryon) {
             if (orig_gen_idx < 6)
                 return Common::ECustomGeneratorIdx::kInjectedAuxCharged;
@@ -121,7 +129,8 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
     bool fIsMC;                     // kTRUE if MC simulation, kFALSE if data
-    bool fIsMC_DedicatedHdibaryon;  //
+    bool fIsMC_DedicatedHdibaryon;  // kTRUE if h-dibaryon MC (LHC26h2), either variant
+    bool fIsMC_HdibEmbedded;        // kTRUE if h-dibaryon MC `embedded` (HIJING + injections), kFALSE if `signal` (boxes + injections)
 
     // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
@@ -145,5 +154,5 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     Schema::Events fOutput;                               //!
     std::unique_ptr<Framework::TeeTree::Writer> fWriter;  //!
 
-    ClassDef(AliTaskEsd2Tree, 3);
+    ClassDef(AliTaskEsd2Tree, 4);
 };

@@ -6,16 +6,15 @@ set -euo pipefail
 
 # check environment
 [[ -z ${E2TH_ROOT_DIR:-} ]] && { echo "error: missing env. var. E2TH_ROOT_DIR"; exit 1; }
-[[ -z ${PI_USER_AND_HOST:-} ]] && { echo "error: missing env. var. ${PI_USER_AND_HOST}"; exit 1; }
-[[ -z ${E2TH_AT_PI_PATH:-} ]] && { echo "error: missing env. var. ${E2TH_AT_PI_PATH}"; exit 1; }
+[[ -z ${PI_USER_AND_HOST:-} ]] && { echo "error: missing env. var. PI_USER_AND_HOST"; exit 1; }
+[[ -z ${E2TH_AT_PI_PATH:-} ]] && { echo "error: missing env. var. E2TH_AT_PI_PATH"; exit 1; }
 
 # ensure remote directories exists
 ssh "${PI_USER_AND_HOST}" mkdir -p "${E2TH_AT_PI_PATH}"
 
 rsync -avzR --delete \
       "${E2TH_ROOT_DIR}"/./run_lists/ \
-      "${E2TH_ROOT_DIR}"/./xml/ \
-      "${E2TH_ROOT_DIR}"/./scripts/scrontab-gsi/ \
+      "${E2TH_ROOT_DIR}"/./scripts/farm-pi/ \
       "${E2TH_ROOT_DIR}"/./task/RunTask.C \
       "${E2TH_ROOT_DIR}"/./task/AliTaskEsd2Tree.h \
       "${E2TH_ROOT_DIR}"/./task/AliTaskEsd2Tree.cxx \

@@ -37,6 +37,7 @@ AliTaskEsd2Tree::AliTaskEsd2Tree()
       //
       fIsMC{false},
       fIsMC_DedicatedHdibaryon{false},
+      fIsMC_HdibEmbedded{false},
       //
       fMC{nullptr},
       fMC_PrimaryVertex{nullptr},
@@ -60,6 +61,7 @@ AliTaskEsd2Tree::AliTaskEsd2Tree(const char *name)
       //
       fIsMC{false},
       fIsMC_DedicatedHdibaryon{false},
+      fIsMC_HdibEmbedded{false},
       //
       fMC{nullptr},
       fMC_PrimaryVertex{nullptr},
@@ -88,15 +90,17 @@ AliTaskEsd2Tree::~AliTaskEsd2Tree() {
 }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Tree.C` macro.
-void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_hdib_mc) {
+void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_hdib_mc, bool is_hdib_embedded) {
     fIsMC = is_mc;
     fIsMC_DedicatedHdibaryon = is_hdib_mc;
+    fIsMC_HdibEmbedded = is_hdib_embedded;
     // print settings //
     AliInfo("Initializing...");
     AliInfo("Settings:");
     AliInfo("========");
     AliInfoF(">> IsMC                    = %i", fIsMC);
     AliInfoF(">> IsMC_DedicatedHdibaryon = %i", fIsMC_DedicatedHdibaryon);
+    AliInfoF(">> IsMC_HdibEmbedded       = %i", fIsMC_HdibEmbedded);
 }
 
 // # Executed at Runtime # //
@@ -305,15 +309,17 @@ bool AliTaskEsd2Tree::ProcessEvent() {
 
     // Event selection //
 
-    // NOTE: exclude h-dibaryon MC, because it doesn't have underlying HIJING event + many detectors are turned off
-    if (!fIsMC_DedicatedHdibaryon && !fEventCuts.AcceptEvent(fESD)) return false;
+    // NOTE: exclude h-dibaryon MC `signal`, because it doesn't have underlying HIJING event + many detectors are turned off;
+    //       h-dibaryon MC `embedded` does have it, so it goes through the same selection as general-purpose MC
+    const bool is_hdib_signal = fIsMC_DedicatedHdibaryon && !fIsMC_HdibEmbedded;
+    if (!is_hdib_signal && !fEventCuts.AcceptEvent(fESD)) return false;
 
     // -- trigger classes
-    // NOTE: same as above, exclude h-dibaryon MC
+    // NOTE: same as above, exclude h-dibaryon MC `signal`
     fOutput.Event.IsINT7 = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) > 0;
     fOutput.Event.IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) > 0;
     fOutput.Event.IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) > 0;
-    if (!fIsMC_DedicatedHdibaryon && !fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
+    if (!is_hdib_signal && !fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
 
     // Assign (rest of) branches //
 
@@ -351,9 +357,9 @@ bool AliTaskEsd2Tree::ProcessEvent() {
         fOutput.MC_Event.PV_X = static_cast<float>(fMC_PrimaryVertex->GetX());
         fOutput.MC_Event.PV_Y = static_cast<float>(fMC_PrimaryVertex->GetY());
         fOutput.MC_Event.PV_Z = static_cast<float>(fMC_PrimaryVertex->GetZ());
-        // NOTE: added protection against dedicated h-dibaryon MC, not because it fails, but because the error logs slow down the program
-        fOutput.MC_Event.IsGenPileup = !fIsMC_DedicatedHdibaryon ? AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing") : false;
-        fOutput.MC_Event.IsSBCPileup = !fIsMC_DedicatedHdibaryon ? AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing") : false;
+        // NOTE: added protection against h-dibaryon MC `signal`, not because it fails, but because the error logs slow down the program
+        fOutput.MC_Event.IsGenPileup = !is_hdib_signal ? AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing") : false;
+        fOutput.MC_Event.IsSBCPileup = !is_hdib_signal ? AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing") : false;
     }
 
     return true;
