@@ -415,9 +415,7 @@ void AliTaskEsd2Tree::ProcessMCParticles() {
                      mc_entry, mcPart->PdgCode(), mcPart->IsPhysicalPrimary(), mcPart->MCStatusCode(), mcPart->GetMother());
         }
 #endif
-#if E2T_MC_EXTRA
         new_mc.IsOOBPileup = AliAnalysisUtils::IsParticleFromOutOfBunchPileupCollision(mc_entry, fMC);
-#endif
 
         // push //
         fOutput.McParticle.emplace_back(new_mc);
@@ -565,7 +563,8 @@ void AliTaskEsd2Tree::ProcessTracks() {
         fOutput.Track.emplace_back(new_track);
 
         // push mc info //
-        if (fIsMC) fOutput.Track_McEntry.emplace_back(std::abs(esd_track->GetLabel()));
+        // NOTE: the label keeps its sign, negative for a fake track
+        if (fIsMC) fOutput.Track_McEntry.emplace_back(esd_track->GetLabel());
     }  // end of loop over tracks
 }
 
@@ -780,7 +779,7 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         float pos_tpc_signal = fIsMC ? fPIDResponse->GetTPCsignalTunedOnData(pos_track) : static_cast<float>(pos_track->GetTPCsignal());
 
         // create new (anti)lambda candidate //
-        POD::PreFoundLambda new_lambda;  // non-initialized on purpose
+        POD::PreFoundLambda new_lambda;  // initialized by default
         new_lambda.PreFoundEntry = static_cast<unsigned int>(entry_v0);
         new_lambda.Decay_X = static_cast<float>(v0->Xv());
         new_lambda.Decay_Y = static_cast<float>(v0->Yv());
@@ -846,9 +845,10 @@ void AliTaskEsd2Tree::ProcessPreFoundLambdas() {
         fOutput.PreFoundLambda.emplace_back(new_lambda);
 
         // push mc info //
+        // NOTE: the labels keep their sign, negative for a fake track
         if (fIsMC) {
-            fOutput.PreFoundLambda_Neg_McEntry.emplace_back(std::abs(neg_track->GetLabel()));
-            fOutput.PreFoundLambda_Pos_McEntry.emplace_back(std::abs(pos_track->GetLabel()));
+            fOutput.PreFoundLambda_Neg_McEntry.emplace_back(neg_track->GetLabel());
+            fOutput.PreFoundLambda_Pos_McEntry.emplace_back(pos_track->GetLabel());
         }
     }
 }

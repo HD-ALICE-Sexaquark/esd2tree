@@ -18,6 +18,11 @@ It runs only at the PI server, deployed there by `scripts/deploy.sh`: the dedica
 (`scripts/farm-pi/`), the real data and the general-purpose MC on the Grid (`scripts/looper/`). Steps in
 `docs/E2T_REPRO.md`.
 
+`scripts/looper/` is the only way to run `RunTask.C` in "grid" mode; `scripts/farm-pi/` and `scripts/exec.sh` run it in
+"local" mode only. `scripts/exec.sh <config_file>` is for interactive tests over one run number, with the configs of
+`config/` (general-purpose MC, h-dibaryon MC, antisexaquark MC, as found in `LOCAL_SIMS_DIR`); it unpacks the tars of
+the dedicated MC by itself.
+
 For basic usage:
 - All env. variables that come with `alienv enter AliRoot/latest,AliPhysics/latest`
 - `ALICE_DATA` : (Reference: https://alisw.github.io/git-advanced/#how-to-use-large-data-files-for-analysis)
@@ -31,9 +36,10 @@ To deploy to the PI server with `scripts/deploy.sh` (from the laptop): `PI_USER_
 
 To fetch the dedicated MC from GSI with `scripts/farm-pi/fetch_sims.sh`, and run on it with
 `scripts/farm-pi/slurm_wrapper.sh`: `LOCAL_SIMS_DIR`, `GSI_USER_AND_HOST`, `FSSR_AT_GSI_PATH` (as in `~/simulations`;
-optional: `FSSR_OUTPUT_AT_GSI_PATH`, default `${FSSR_AT_GSI_PATH}/output`).
+optional: `FSSR_OUTPUT_AT_GSI_PATH`, default `${FSSR_AT_GSI_PATH}/output`). The configs of `config/` need
+`LOCAL_SIMS_DIR` too.
 
-To submit jobs to the Grid with `scripts/looper/` (or `scripts/exec.sh`), and to use `scripts/generate_xml.sh`:
+To submit jobs to the Grid with `scripts/looper/`, and to use `scripts/generate_xml.sh`:
 `LOOPER_DIR`, `JALIEN_TOKEN_CERT`, `JALIEN_TOKEN_KEY`, `GRID_ABORQUEZ_HOME_DIR` (the Grid home dir that holds `xml/`).
 
 ## Input
@@ -67,4 +73,5 @@ A file named `AnalysisResults.root`, containing:
      otherwise
    - `POD::PreFoundLambda` (as defined in `common/POD_PreFoundLambda.hpp`)
    - in MC: `POD::MC::Event`, `POD::McParticle` (as defined in `common/POD_McParticle.hpp`), and the indices of each
-     track's and each pre-found (anti)lambda daughter's `McParticle`
+     track's and each pre-found (anti)lambda daughter's `McParticle`, signed as `AliESDtrack::GetLabel()`: negative for
+     a fake track, so `McParticle` is indexed with their absolute value

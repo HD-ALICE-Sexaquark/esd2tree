@@ -18,7 +18,7 @@
 
 #include "AliTaskEsd2Tree.h"
 
-void RunTask(const char *Mode,            // "local", "grid"
+void RunTask(const char *Mode,            // "local" (`scripts/exec.sh`, `scripts/farm-pi/`), "grid" (`scripts/looper/`)
              const char *InputPath,       // what comes before the RN; for sexa and hdib MC, ending in "/signal" or "/embedded"
              const char *ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
                                           // for gen. purp. MC: "LHC20e3a", "LHC20e3b", "LHC20j6a", "LHC20j6b"
@@ -26,7 +26,7 @@ void RunTask(const char *Mode,            // "local", "grid"
                                           // for hdib MC: "LHC26h2"
              int RunNumber,               // single run number
              /* only valid when "local" */
-             int Local_NDirs = 1,                 // number of subdirs~files to run
+             int Local_NDirs = 1,                 // number of subdirs~files to run, 0 means all
              long long Local_LimitToNEvents = 0,  // 0 means all events
              /* only valid when "grid" */
              const char *Grid_WorkingDir = "",  // customize output dirs, relative to GRID's home dir
@@ -36,6 +36,10 @@ void RunTask(const char *Mode,            // "local", "grid"
     // # Derive Options # //
 
     bool IsGridMode = TString(Mode) == "grid";
+    if (!IsGridMode && TString(Mode) != "local") {
+        std::cout << "ERROR !! RunTask.C !! Unknown Mode " << Mode << ", expected \"local\" or \"grid\"" << '\n';
+        return;
+    }
 
     auto ProductionName_TStr = TString(ProductionName);
     // NOTE: anything else stops here, e.g. the retired "LHC23l1a3", "LHC23l1b3" and "LHC26h", which would otherwise run as gen. purp. MC
@@ -55,6 +59,12 @@ void RunTask(const char *Mode,            // "local", "grid"
         return;
     }
     bool IsEmbeddedMC = (IsSexaMC || IsHdibMC) && Variant == "embedded";
+
+    // NOTE: the dedicated MC isn't on the GRID: it's simulated at GSI, and processed at PI by `scripts/farm-pi/`
+    if (IsGridMode && (IsSexaMC || IsHdibMC)) {
+        std::cout << "ERROR !! RunTask.C !! " << ProductionName << " runs only in \"local\" mode" << '\n';
+        return;
+    }
 
     // IMPORTANT: time-dependent choice
     // - on for sexa MC and GP MC
@@ -239,11 +249,14 @@ void RunTask(const char *Mode,            // "local", "grid"
         // local mode //
         chain = new TChain("esdTree");
         if (IsMC) {
-            for (int DN = 1; DN <= Local_NDirs; ++DN) {
+            int dir_counter = 0;
+            for (int DN = 1; DN <= 999; ++DN) {  // <DDD>
+                if (Local_NDirs > 0 && dir_counter == Local_NDirs) break;
                 FilePath = Form("%s/%i/%03i/AliESDs.root", InputPath, RunNumber, DN);
                 if (gSystem->AccessPathName(FilePath)) continue;  // e.g. dirs of failed jobs, removed after the production
                 std::cout << "INFO  !! RunTask.C !! Adding file " << FilePath << '\n';
                 chain->AddFile(FilePath);
+                dir_counter++;
             }
         } else {  // data
             TString top_path = Form("%s/000%i/pass%i", InputPath, RunNumber, PassNumber);
@@ -266,6 +279,10 @@ void RunTask(const char *Mode,            // "local", "grid"
                 chain->AddFile(FilePath);
                 dir_counter++;
             }
+        }
+        if (chain->GetNtrees() == 0) {
+            std::cout << "ERROR !! RunTask.C !! No AliESDs.root found for run " << RunNumber << " in " << InputPath << '\n';
+            return;
         }
         if (Local_LimitToNEvents == 0)
             mgr->StartAnalysis("local", chain);  // read all events

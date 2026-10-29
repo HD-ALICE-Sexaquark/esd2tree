@@ -19,7 +19,7 @@ set -euo pipefail
 shopt -s nullglob
 
 # hardcoded options
-export MODE="local"
+# NOTE: always "local" mode, as `RunTask.C` is called by `slurm_exec.sh`; the GRID is `scripts/looper/`'s
 export MAX_N_DN_DIRS=25 # max number of <dir number> dirs to add; = all of them, as produced by `farm-gsi/submit.sh`
 max_parallel_jobs=48
 
@@ -49,7 +49,7 @@ max_n_runs=${2:-0} # 0 = no limit
 
 # define output dir
 short_tag=${OUTPUT_TAG%/*} # e.g. LHC23l1ab4_A/signal -> LHC23l1ab4_A
-export OUTPUT_DIR=${E2T_OUTPUT_DIR}/${MODE}_mc_${short_tag#LHC}/${VARIANT}
+export OUTPUT_DIR=${E2T_OUTPUT_DIR}/local_mc_${short_tag#LHC}/${VARIANT}
 
 # define arrays
 # -- skip the run numbers already done

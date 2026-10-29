@@ -14,6 +14,7 @@ ssh "${PI_USER_AND_HOST}" mkdir -p "${E2T_AT_PI_PATH}"
 
 # NOTE: explicit paths only, so `--delete` never reaches the remote `xml/`, `output/`, `slurm/` or the looper dir
 rsync -avzR --delete \
+      "${E2T_ROOT_DIR}"/./config/ \
       "${E2T_ROOT_DIR}"/./run_lists/ \
       "${E2T_ROOT_DIR}"/./scripts/farm-pi/ \
       "${E2T_ROOT_DIR}"/./scripts/looper/ \

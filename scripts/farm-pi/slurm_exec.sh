@@ -20,7 +20,6 @@ shopt -s nullglob
 if [[ -z ${LOCAL_SIMS_DIR:-} ]]; then echo "error: missing env. var. LOCAL_SIMS_DIR"; exit 1; fi
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 # -- batch options
-if [[ -z ${MODE:-} ]]; then echo "error: missing env. var. MODE"; exit 1; fi
 if [[ -z ${MAX_N_DN_DIRS:-} ]]; then echo "error: missing env. var. MAX_N_DN_DIRS"; exit 1; fi
 if [[ -z ${OUTPUT_TAG:-} ]]; then echo "error: missing env. var. OUTPUT_TAG"; exit 1; fi
 if [[ -z ${PRODUCTION_NAME:-} ]]; then echo "error: missing env. var. PRODUCTION_NAME"; exit 1; fi
@@ -75,8 +74,9 @@ cp "${E2T_ROOT_DIR}/common/Cuts_E2T.hpp" .
 cp "${E2T_ROOT_DIR}/common/Constants.hpp" .
 
 # main command #
+# NOTE: always "local" mode
 
-analysis_options="\"${MODE}\","
+analysis_options="\"local\","
 analysis_options+="\"${input_path}\","
 analysis_options+="\"${PRODUCTION_NAME}\","
 analysis_options+="${run_number},"

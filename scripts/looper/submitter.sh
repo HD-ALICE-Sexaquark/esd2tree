@@ -73,13 +73,10 @@ submit_masterjob() {
     # submit jobs via aliroot
     local aliroot_command aliroot_logfile
     # -- prepare command
-    # <mode> <input_path> <production_name> <run_number> <n_dirs> <limit_n_events> <grid_working_dir> <custom_xml>
-    aliroot_command=$(build_analysis_command "grid" \
-                                             "${grid_input_dir}" \
+    # <input_path> <production_name> <run_number> <grid_working_dir> <custom_xml>
+    aliroot_command=$(build_analysis_command "${grid_input_dir}" \
                                              "${production_name}" \
                                              "${run_number}" \
-                                             0 \
-                                             0 \
                                              "${grid_working_dir}" \
                                              "${local_xml}")
     log_msg "${script_name}" "${job_tag}" "executing: ${aliroot_command}"

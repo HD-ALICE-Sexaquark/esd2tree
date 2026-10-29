@@ -323,18 +323,18 @@ stage_analysis_files() {
 
 # === analysis command builder === #
 
-# usage: build_analysis_command <mode> <input_path> <production_name> <run_number> \
-#                               <n_dirs> <limit_n_events> <grid_working_dir> <custom_xml>
+# usage: build_analysis_command <input_path> <production_name> <run_number> <grid_working_dir> <custom_xml>
+# NOTE: always "grid" mode; `scripts/exec.sh` and `scripts/farm-pi/` are the "local" ones
 build_analysis_command() {
     local opts="("
-    opts+="\"$1\","   # Mode
-    opts+="\"$2\","   # InputPath
-    opts+="\"$3\","   # ProductionName
-    opts+="$4,"       # RunNumber
-    opts+="${5},"     # Local_NDirs
-    opts+="${6},"     # Local_LimitToNEvents
-    opts+="\"${7}\"," # Grid_WorkingDir
-    opts+="\"${8}\""  # Grid_CustomXML
+    opts+="\"grid\"," # Mode
+    opts+="\"$1\","   # InputPath
+    opts+="\"$2\","   # ProductionName
+    opts+="$3,"       # RunNumber
+    opts+="0,"        # Local_NDirs, unused
+    opts+="0,"        # Local_LimitToNEvents, unused
+    opts+="\"${4}\"," # Grid_WorkingDir
+    opts+="\"${5}\""  # Grid_CustomXML
     opts+=")"
     echo "aliroot -l -b -q RunTask.C${opts}"
 }
