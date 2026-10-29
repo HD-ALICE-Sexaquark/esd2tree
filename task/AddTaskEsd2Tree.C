@@ -2,7 +2,7 @@
 
 #include "AliTaskEsd2Tree.h"
 
-AliTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_hdib_mc, bool is_hdib_embedded) {
+AliTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_sexa_mc, bool is_hdib_mc, bool is_embedded, bool process_tracks) {
 
     AliAnalysisManager *mgr = AliAnalysisManager::GetAnalysisManager();
     if (mgr == nullptr) return nullptr;
@@ -10,7 +10,7 @@ AliTaskEsd2Tree *AddTaskEsd2Tree(bool is_mc, bool is_hdib_mc, bool is_hdib_embed
     auto *task = new AliTaskEsd2Tree("AliTaskEsd2Tree");
 
     // NOTE: `SelectCollisionCandidates` omitted because the trigger selection is done by `fEventCuts` within the task's `ProcessEvent`
-    task->Initialize(is_mc, is_hdib_mc, is_hdib_embedded);
+    task->Initialize(is_mc, is_sexa_mc, is_hdib_mc, is_embedded, process_tracks);
 
     mgr->AddTask(task);
     mgr->ConnectInput(task, 0, mgr->GetCommonInputContainer());

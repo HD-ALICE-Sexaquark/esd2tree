@@ -19,9 +19,10 @@
 #include "AliTaskEsd2Tree.h"
 
 void RunTask(const char *Mode,            // "local", "grid"
-             const char *InputPath,       // what comes before the RN; for hdib MC, ending in "/signal" or "/embedded"
+             const char *InputPath,       // what comes before the RN; for sexa and hdib MC, ending in "/signal" or "/embedded"
              const char *ProductionName,  // for data: "LHC15o", "LHC18q", "LHC18r"
-                                          // for gen. purp. MC: "LHC20e3a", "LHC20j6a"
+                                          // for gen. purp. MC: "LHC20e3a", "LHC20e3b", "LHC20j6a", "LHC20j6b"
+                                          // for sexa MC: "LHC23l1ab4"
                                           // for hdib MC: "LHC26h2"
              int RunNumber,               // single run number
              /* only valid when "local" */
@@ -37,16 +38,27 @@ void RunTask(const char *Mode,            // "local", "grid"
     bool IsGridMode = TString(Mode) == "grid";
 
     auto ProductionName_TStr = TString(ProductionName);
+    // NOTE: anything else stops here, e.g. the retired "LHC23l1a3", "LHC23l1b3" and "LHC26h", which would otherwise run as gen. purp. MC
+    TString KnownProductions = " LHC15o LHC18q LHC18r LHC20e3a LHC20e3b LHC20j6a LHC20j6b LHC23l1ab4 LHC26h2 ";
+    if (!KnownProductions.Contains(" " + ProductionName_TStr + " ")) {
+        std::cout << "ERROR !! RunTask.C !! Unknown ProductionName " << ProductionName << ", expected one of:" << KnownProductions << '\n';
+        return;
+    }
     bool IsMC = ProductionName_TStr.Contains("LHC2");  // fragile MC detection, but Run 2 finished in 2018
+    bool IsSexaMC = ProductionName_TStr == "LHC23l1ab4";
     bool IsHdibMC = ProductionName_TStr == "LHC26h2";
 
-    // hdib MC variant, from InputPath's last directory: "signal" (boxes + injections) or "embedded" (HIJING + injections)
-    auto HdibVariant = TString(gSystem->BaseName(InputPath));
-    if (IsHdibMC && HdibVariant != "signal" && HdibVariant != "embedded") {
+    // dedicated MC variant, from InputPath's last directory: "signal" (boxes + injections) or "embedded" (HIJING + injections)
+    auto Variant = TString(gSystem->BaseName(InputPath));
+    if ((IsSexaMC || IsHdibMC) && Variant != "signal" && Variant != "embedded") {
         std::cout << "ERROR !! RunTask.C !! For " << ProductionName << ", InputPath must end in \"/signal\" or \"/embedded\"" << '\n';
         return;
     }
-    bool IsHdibEmbeddedMC = IsHdibMC && HdibVariant == "embedded";
+    bool IsEmbeddedMC = (IsSexaMC || IsHdibMC) && Variant == "embedded";
+
+    // tracks feed the antisexaquark search: on for its MC and the gen. purp. MC; off for real data, whose antisexaquark trees are frozen
+    // (E2T `f1ba831`), and for hdib MC
+    bool ProcessTracks = IsMC && !IsHdibMC;
 
     int SplitMaxNFiles = 60;        // default for data
     if (IsMC) SplitMaxNFiles = 12;  // default for MC
@@ -83,7 +95,7 @@ void RunTask(const char *Mode,            // "local", "grid"
         alienHandler->AddIncludePath("-I. -I${ROOTSYS}/include -I${ALICE_ROOT} -I${ALICE_ROOT}/include -I${ALICE_PHYSICS}/include");
         TString additional_libs =
             "AliTaskEsd2Tree.cxx AliTaskEsd2Tree.h AliTaskEsd2Tree_LinkDef.h Constants.hpp Framework_TeeTree.hpp Schema_Events.hpp "
-            "POD_Event.hpp POD_InjectedSexa.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp Cuts_E2T.hpp Math.hpp";
+            "POD_Event.hpp POD_McParticle.hpp POD_PreFoundLambda.hpp POD_Track.hpp Cuts_E2T.hpp Math.hpp";
         alienHandler->SetAdditionalLibs(additional_libs);
         alienHandler->SetTTL(TimeToLive);
         alienHandler->SetDefaultOutputs(false);
@@ -199,7 +211,8 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     gInterpreter->LoadMacro("AliTaskEsd2Tree.cxx++g");
 
-    TString TaskEsd2Tree_Options = Form("(%i, %i, %i)", (int)IsMC, (int)IsHdibMC, (int)IsHdibEmbeddedMC);
+    TString TaskEsd2Tree_Options =
+        Form("(%i, %i, %i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC, (int)IsEmbeddedMC, (int)ProcessTracks);
     AliTaskEsd2Tree *TaskEsd2Tree = reinterpret_cast<AliTaskEsd2Tree *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
     if (TaskEsd2Tree == nullptr) return;

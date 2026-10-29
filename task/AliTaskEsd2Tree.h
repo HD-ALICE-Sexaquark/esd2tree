@@ -17,6 +17,7 @@
 #include "AliTaskEsd2Tree_LinkDef.h"
 
 class TClass;
+class TBits;
 class TList;
 class TFile;
 class TH1F;
@@ -33,7 +34,8 @@ class AliPIDResponse;
 
 class AliTaskEsd2Tree : public AliAnalysisTaskSE {
 
-    // NOTE: no tracks are stored; kept only to book `Tracks_Bookkeeping` (left empty) with the same bins, which T2DS requires
+    // NOTE: frozen, as the antisexaquark real-data trees (`f1ba831`); when tracks aren't processed, `Tracks_Bookkeeping` is still booked
+    //       with these bins, and left empty, because T2DS requires it
     enum ETrack {
         kAllTracks,
         kValidStatusTPC_1,
@@ -79,7 +81,7 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     ~AliTaskEsd2Tree();
 
     // Settings ~ stored in Analysis Manager //
-    void Initialize(bool is_mc, bool is_hdib_mc = false, bool is_hdib_embedded = false);
+    void Initialize(bool is_mc, bool is_sexa_mc = false, bool is_hdib_mc = false, bool is_embedded = false, bool process_tracks = false);
 
     // Main ~ executed at runtime //
     void UserCreateOutputObjects();
@@ -93,27 +95,41 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     // MC Particles //
     void ProcessMCParticles();
 
+    // Tracks //
+    void ProcessTracks();
+
     // (Anti)Lambdas //
     void ProcessPreFoundLambdas();
 
     // Utilities //
     Common::ECustomGeneratorIdx GetCustomGeneratorIndex(const AliMCParticle* mc) const {
+        if (!fIsMC_DedicatedSexaquark && !fIsMC_DedicatedHdibaryon) return Common::kHijing;  // valid for general-purpose MC
+        // both dedicated MC productions share the generator layout, and differ only in what they inject
+        Common::ECustomGeneratorIdx injected =
+            fIsMC_DedicatedSexaquark ? Common::ECustomGeneratorIdx::kInjectedAntiSexaquarkReaction : Common::ECustomGeneratorIdx::kInjectedHdibaryon;
         short orig_gen_idx = mc->GetGeneratorIndex();
-        // h-dibaryon MC `embedded`: HIJING (0) + injected (anti)h-dibaryons (1)
-        if (fIsMC_HdibEmbedded) {
+        // `embedded`: HIJING (0) + injections (1)
+        if (fIsMC_Embedded) {
             if (orig_gen_idx == 0)
                 return Common::ECustomGeneratorIdx::kHijing;
             else
-                return Common::ECustomGeneratorIdx::kInjectedHdibaryon;
+                return injected;
         }
-        // h-dibaryon MC `signal`: boxes of auxiliary charged primaries (0-5) + injected (anti)h-dibaryons (6)
-        if (fIsMC_DedicatedHdibaryon) {
-            if (orig_gen_idx < 6)
-                return Common::ECustomGeneratorIdx::kInjectedAuxCharged;
-            else
-                return Common::ECustomGeneratorIdx::kInjectedHdibaryon;
+        // `signal`: boxes of auxiliary charged primaries (0-5) + injections (6)
+        if (orig_gen_idx < 6)
+            return Common::ECustomGeneratorIdx::kInjectedAuxCharged;
+        else
+            return injected;
+    }
+    static int GetFirstRow(const TBits& map) {
+        int firstRow = -1;  // default value
+        for (int i = 0; i < 159; ++i) {
+            if (map.TestBitNumber(i)) {
+                firstRow = i;
+                break;
+            }
         }
-        return Common::kHijing;  // valid for general-purpose MC
+        return firstRow;
     }
     // Distance in (pt, pz) between a momentum and a track parametrization; both are constant along a helix.
     static double GetMomentumMismatch(const double* momentum, const AliExternalTrackParam& param) {
@@ -129,8 +145,10 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
    private:
     // Settings ~ stored in Analysis Manager ~ all persistent //
     bool fIsMC;                     // kTRUE if MC simulation, kFALSE if data
+    bool fIsMC_DedicatedSexaquark;  // kTRUE if antisexaquark MC (LHC23l1ab4), either variant
     bool fIsMC_DedicatedHdibaryon;  // kTRUE if h-dibaryon MC (LHC26h2), either variant
-    bool fIsMC_HdibEmbedded;        // kTRUE if h-dibaryon MC `embedded` (HIJING + injections), kFALSE if `signal` (boxes + injections)
+    bool fIsMC_Embedded;            // kTRUE if a dedicated MC's `embedded` variant (HIJING + injections), kFALSE if `signal` (boxes + injections)
+    bool fProcessTracks;            // kTRUE to select and store tracks
 
     // AliRoot Objects //
     AliMCEvent* fMC;                      //! MC event
@@ -154,5 +172,5 @@ class AliTaskEsd2Tree : public AliAnalysisTaskSE {
     Schema::Events fOutput;                               //!
     std::unique_ptr<Framework::TeeTree::Writer> fWriter;  //!
 
-    ClassDef(AliTaskEsd2Tree, 4);
+    ClassDef(AliTaskEsd2Tree, 5);
 };

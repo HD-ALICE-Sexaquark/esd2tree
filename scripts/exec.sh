@@ -61,7 +61,6 @@ for index in "${!arr_custom_xml[@]}"; do
     cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
     cp "${E2T_ROOT_DIR}/common/Math.hpp" .
     cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
-    cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
     cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
     cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
     cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .

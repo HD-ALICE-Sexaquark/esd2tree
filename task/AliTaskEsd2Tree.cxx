@@ -36,8 +36,10 @@ AliTaskEsd2Tree::AliTaskEsd2Tree()
     : AliAnalysisTaskSE{},
       //
       fIsMC{false},
+      fIsMC_DedicatedSexaquark{false},
       fIsMC_DedicatedHdibaryon{false},
-      fIsMC_HdibEmbedded{false},
+      fIsMC_Embedded{false},
+      fProcessTracks{false},
       //
       fMC{nullptr},
       fMC_PrimaryVertex{nullptr},
@@ -60,8 +62,10 @@ AliTaskEsd2Tree::AliTaskEsd2Tree(const char *name)
     : AliAnalysisTaskSE{name},
       //
       fIsMC{false},
+      fIsMC_DedicatedSexaquark{false},
       fIsMC_DedicatedHdibaryon{false},
-      fIsMC_HdibEmbedded{false},
+      fIsMC_Embedded{false},
+      fProcessTracks{false},
       //
       fMC{nullptr},
       fMC_PrimaryVertex{nullptr},
@@ -90,17 +94,21 @@ AliTaskEsd2Tree::~AliTaskEsd2Tree() {
 }
 
 // Initialize analysis task. Needs to be called within an `AddTaskEsd2Tree.C` macro.
-void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_hdib_mc, bool is_hdib_embedded) {
+void AliTaskEsd2Tree::Initialize(bool is_mc, bool is_sexa_mc, bool is_hdib_mc, bool is_embedded, bool process_tracks) {
     fIsMC = is_mc;
+    fIsMC_DedicatedSexaquark = is_sexa_mc;
     fIsMC_DedicatedHdibaryon = is_hdib_mc;
-    fIsMC_HdibEmbedded = is_hdib_embedded;
+    fIsMC_Embedded = is_embedded;
+    fProcessTracks = process_tracks;
     // print settings //
     AliInfo("Initializing...");
     AliInfo("Settings:");
     AliInfo("========");
     AliInfoF(">> IsMC                    = %i", fIsMC);
+    AliInfoF(">> IsMC_DedicatedSexaquark = %i", fIsMC_DedicatedSexaquark);
     AliInfoF(">> IsMC_DedicatedHdibaryon = %i", fIsMC_DedicatedHdibaryon);
-    AliInfoF(">> IsMC_HdibEmbedded       = %i", fIsMC_HdibEmbedded);
+    AliInfoF(">> IsMC_Embedded           = %i", fIsMC_Embedded);
+    AliInfoF(">> ProcessTracks           = %i", fProcessTracks);
 }
 
 // # Executed at Runtime # //
@@ -119,7 +127,7 @@ void AliTaskEsd2Tree::UserCreateOutputObjects() {
     // Prepare output TTree //
 
     OpenFile(2)->SetCompressionLevel(9);
-    fWriter = std::make_unique<Framework::TeeTree::Writer>(fOutput.CreateModel_TeeTree(fIsMC, false), E2T::Name_OutputTree);
+    fWriter = std::make_unique<Framework::TeeTree::Writer>(fOutput.CreateModel_TeeTree(fIsMC), E2T::Name_OutputTree);
     fOutputTree = fWriter->GetTree();
 
     // Prepare output list and histograms //
@@ -213,7 +221,7 @@ bool AliTaskEsd2Tree::UserNotify() {
     if (fIsMC) {
         // NOTES:
         // - path of gen. purp. MC ends with format `.../297595/001/AliESDs.root`
-        // - path of h-dibaryon MC ends with format `.../signal/297595/001/AliESDs.root`
+        // - path of dedicated MC ends with format `.../signal/297595/001/AliESDs.root` (or `.../embedded/...`)
         fOutput.Event.RunNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 3)))->GetString().Atoi();
         fOutput.Event.DirNumber = (dynamic_cast<TObjString *>(tokens->At(tokens_n_entries - 2)))->GetString().Atoi();
         fOutput.Event.DirNumberB = 0;                                              // non-existent in MC
@@ -261,7 +269,8 @@ void AliTaskEsd2Tree::UserExec(Option_t *option) {
 
     // tracks //
 
-    // NOTE: not processed, `Track` and `Track_McEntry` are written empty
+    // NOTE: when not processed, `Track` and `Track_McEntry` are written empty
+    if (fProcessTracks) ProcessTracks();
 
     // (anti)lambdas //
 
@@ -270,7 +279,7 @@ void AliTaskEsd2Tree::UserExec(Option_t *option) {
     // end of event //
 
     fWriter->Fill();
-    fOutput.Clear(fIsMC, false);
+    fOutput.Clear(fIsMC);
 
     // post data //
 
@@ -309,17 +318,17 @@ bool AliTaskEsd2Tree::ProcessEvent() {
 
     // Event selection //
 
-    // NOTE: exclude h-dibaryon MC `signal`, because it doesn't have underlying HIJING event + many detectors are turned off;
-    //       h-dibaryon MC `embedded` does have it, so it goes through the same selection as general-purpose MC
-    const bool is_hdib_signal = fIsMC_DedicatedHdibaryon && !fIsMC_HdibEmbedded;
-    if (!is_hdib_signal && !fEventCuts.AcceptEvent(fESD)) return false;
+    // NOTE: exclude the dedicated MC's `signal` variant, because it doesn't have underlying HIJING event + many detectors are turned off;
+    //       their `embedded` variant does have it, so it goes through the same selection as general-purpose MC
+    const bool is_dedicated_signal = (fIsMC_DedicatedSexaquark || fIsMC_DedicatedHdibaryon) && !fIsMC_Embedded;
+    if (!is_dedicated_signal && !fEventCuts.AcceptEvent(fESD)) return false;
 
     // -- trigger classes
-    // NOTE: same as above, exclude h-dibaryon MC `signal`
+    // NOTE: same as above, exclude the dedicated MC's `signal` variant
     fOutput.Event.IsINT7 = (fInputHandler->IsEventSelected() & AliVEvent::kINT7) > 0;
     fOutput.Event.IsCentral = (fInputHandler->IsEventSelected() & AliVEvent::kCentral) > 0;
     fOutput.Event.IsSemiCentral = (fInputHandler->IsEventSelected() & AliVEvent::kSemiCentral) > 0;
-    if (!is_hdib_signal && !fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
+    if (!is_dedicated_signal && !fOutput.Event.IsINT7 && !fOutput.Event.IsCentral && !fOutput.Event.IsSemiCentral) return false;
 
     // Assign (rest of) branches //
 
@@ -357,9 +366,10 @@ bool AliTaskEsd2Tree::ProcessEvent() {
         fOutput.MC_Event.PV_X = static_cast<float>(fMC_PrimaryVertex->GetX());
         fOutput.MC_Event.PV_Y = static_cast<float>(fMC_PrimaryVertex->GetY());
         fOutput.MC_Event.PV_Z = static_cast<float>(fMC_PrimaryVertex->GetZ());
-        // NOTE: added protection against h-dibaryon MC `signal`, not because it fails, but because the error logs slow down the program
-        fOutput.MC_Event.IsGenPileup = !is_hdib_signal ? AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing") : false;
-        fOutput.MC_Event.IsSBCPileup = !is_hdib_signal ? AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing") : false;
+        // NOTE: added protection against the dedicated MC's `signal` variant, not because it fails, but because the error logs slow down
+        //       the program
+        fOutput.MC_Event.IsGenPileup = !is_dedicated_signal ? AliAnalysisUtils::IsPileupInGeneratedEvent(fMC, "Hijing") : false;
+        fOutput.MC_Event.IsSBCPileup = !is_dedicated_signal ? AliAnalysisUtils::IsSameBunchPileupInGeneratedEvent(fMC, "Hijing") : false;
     }
 
     return true;
@@ -400,7 +410,7 @@ void AliTaskEsd2Tree::ProcessMCParticles() {
         new_mc.IsSecFromMat = mcPart->IsSecondaryFromMaterial();
         new_mc.IsSecFromWeak = mcPart->IsSecondaryFromWeakDecay();
 #if E2T_VERBOSE
-        if (new_mc.Generator == Common::kInjectedHdibaryon) {
+        if (new_mc.Generator == Common::kInjectedHdibaryon || new_mc.Generator == Common::kInjectedAntiSexaquarkReaction) {
             AliInfoF("mc_entry=%i,mc_pdg=%i,mc_is_physprim=%i,mc_status=%i,mother_entry=%i",  //
                      mc_entry, mcPart->PdgCode(), mcPart->IsPhysicalPrimary(), mcPart->MCStatusCode(), mcPart->GetMother());
         }
@@ -412,6 +422,151 @@ void AliTaskEsd2Tree::ProcessMCParticles() {
         // push //
         fOutput.McParticle.emplace_back(new_mc);
     }  // end of loop over MC particles
+}
+
+// # Reconstructed # //
+
+// Loop over the reconstructed tracks in a single event.
+void AliTaskEsd2Tree::ProcessTracks() {
+
+    // vector preallocation //
+    const int n_tracks = fESD->GetNumberOfTracks();
+    fOutput.Track.reserve(n_tracks);
+    if (fIsMC) fOutput.Track_McEntry.reserve(n_tracks);
+
+    // allocate c-arrays //
+    double position[3]{};
+    double momentum[3]{};
+    double cov_xyz_pxpypz[Common::NCovMatrixComponents_State6]{};
+    float pre_dca[2]{};
+    float pre_dca_cov[3]{};
+
+    // read tracks //
+    for (int esd_entry = 0; esd_entry < n_tracks; ++esd_entry) {
+        auto *esd_track = fESD->GetTrack(esd_entry);
+        if (esd_track == nullptr) continue;
+
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kAllTracks);
+
+        // track selection //
+
+        // tpc status (1)
+        auto status = esd_track->GetStatus();
+        bool tpc_in = (status & AliESDtrack::kTPCin) > 0;
+        bool tpc_refit = (status & AliESDtrack::kTPCrefit) > 0;
+        if (!tpc_in || !tpc_refit) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kValidStatusTPC_1);
+
+        // tpc status (2)
+        const auto *inner_param = esd_track->GetInnerParam();
+        if (inner_param == nullptr) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kValidStatusTPC_2);
+
+        // its status -- equivalent to counting n hits on its
+        bool its_in = (status & AliESDtrack::kITSin) > 0;
+        if (its_in) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kNoHitInITS);
+
+        // pre-calc. dca w.r.t pv
+        esd_track->GetImpactParameters(pre_dca, pre_dca_cov);
+        float pre_dca_xy = std::abs(pre_dca[0]);
+        float pre_dca_z = std::abs(pre_dca[1]);
+        if (pre_dca_xy < E2T::Cuts::Track::Min_PreDCAxy) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAxy);
+        if (pre_dca_xy > E2T::Cuts::Track::Max_PreDCAxy) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAxy);
+        if (pre_dca_z < E2T::Cuts::Track::Min_PreDCAz) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPreDCAz);
+        if (pre_dca_z > E2T::Cuts::Track::Max_PreDCAz) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPreDCAz);
+
+        // max |pz|
+        if (std::abs(inner_param->Pz()) > E2T::Cuts::Track::AbsMax_Pz) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesAbsMaxPz);
+
+        // min pt
+        if (inner_param->Pt() < E2T::Cuts::Track::Min_Pt) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinPt);
+
+        // max pt
+        if (inner_param->Pt() > E2T::Cuts::Track::Max_Pt) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMaxPt);
+
+        // max |eta|
+        if (std::abs(inner_param->Eta()) > E2T::Cuts::Track::AbsMax_Eta) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesAbsMaxEta);
+
+        // n clusters
+        // NOTE: `Min_TPC_NClusters` is currently 0, so the explicit zero test below is what protects the division, not the cut
+        auto tpc_n_clusters = esd_track->GetTPCNcls();
+        if (tpc_n_clusters == 0 || tpc_n_clusters < E2T::Cuts::Track::Min_TPC_NClusters) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesMinNTPCClusters);
+
+        // chi2 / nclusters
+        auto tpc_chi2_ncls = esd_track->GetTPCchi2() / static_cast<double>(tpc_n_clusters);
+        if (tpc_chi2_ncls > E2T::Cuts::Track::Max_TPC_Chi2_NClusters) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPassesChi2NClusters);
+
+        // kink rejection
+        if (esd_track->GetKinkIndex(0) > 0) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kNotAKink);
+
+        // pid (1)
+        // NOTE: turned off the cut (was the most expensive), because it fails in 18q, but kept the bookkeeping hist for merging purposes
+        // auto pid_status = fPIDResponse->CheckPIDStatus(AliPIDResponse::kTPC, esd_track);
+        // if (pid_status != AliPIDResponse::kDetPidOk) continue;  // apply cut
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kHasValidPid);
+
+        // pid (2) -- these functions include corrections (when RD) + tuning on data (when MC)
+        // NOTE: they must run before `GetTPCsignalTunedOnData()` below, which they are what populates
+        float n_sigmas_p = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kProton);
+        float n_sigmas_k = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kKaon);
+        float n_sigmas_pi = fPIDResponse->NumberOfSigmasTPC(esd_track, AliPID::kPion);
+        if (std::abs(n_sigmas_p) > E2T::Cuts::Track::AbsMax_NSigmas_PID && std::abs(n_sigmas_k) > E2T::Cuts::Track::AbsMax_NSigmas_PID &&
+            std::abs(n_sigmas_pi) > E2T::Cuts::Track::AbsMax_NSigmas_PID) {
+            continue;  // apply cut
+        }
+        fHist_Tracks_Bookkeeping->Fill(ETrack::kPidWithinRange);
+
+        // create new //
+        POD::Track new_track;  // non-initialized on purpose
+        new_track.EsdEntry = static_cast<unsigned int>(esd_entry);
+        inner_param->GetXYZ(position);
+        new_track.X = static_cast<float>(position[0]);
+        new_track.Y = static_cast<float>(position[1]);
+        new_track.Z = static_cast<float>(position[2]);
+        inner_param->GetPxPyPz(momentum);
+        new_track.Px = static_cast<float>(momentum[0]);
+        new_track.Py = static_cast<float>(momentum[1]);
+        new_track.Pz = static_cast<float>(momentum[2]);
+        // -- dca
+        new_track.PreDCAxy = pre_dca_xy;
+        new_track.PreDCAz = pre_dca_z;
+        // -- pid; for RD, it includes corrections; for MC, this is the correct way
+        new_track.TPC_Signal = fIsMC ? static_cast<float>(esd_track->GetTPCsignalTunedOnData()) : static_cast<float>(esd_track->GetTPCsignal());
+        new_track.NSigmasPion = n_sigmas_pi;
+        new_track.NSigmasKaon = n_sigmas_k;
+        new_track.NSigmasProton = n_sigmas_p;
+        // -- cov. matrix
+        inner_param->GetCovarianceXYZPxPyPz(cov_xyz_pxpypz);
+        for (std::size_t idx_cov = 0; idx_cov < Common::NCovMatrixComponents_State6; ++idx_cov) {
+            new_track.CovMatrix[idx_cov] = static_cast<float>(cov_xyz_pxpypz[idx_cov]);
+        }
+        new_track.TPC_FirstRow = GetFirstRow(esd_track->GetTPCClusterMap());
+        // -- extra tpc branches
+        new_track.TPC_NCrossedRows = esd_track->GetTPCCrossedRows();
+        new_track.TPC_NClusters = tpc_n_clusters;
+        new_track.TPC_NClustersFindable = esd_track->GetTPCNclsF();
+        new_track.TPC_Chi2 = static_cast<float>(esd_track->GetTPCchi2());
+        // -- charge
+        new_track.Charge = esd_track->Charge();
+
+        // push reconstructed //
+        fOutput.Track.emplace_back(new_track);
+
+        // push mc info //
+        if (fIsMC) fOutput.Track_McEntry.emplace_back(std::abs(esd_track->GetLabel()));
+    }  // end of loop over tracks
 }
 
 // # Lambdas # //

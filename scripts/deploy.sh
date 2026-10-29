@@ -24,7 +24,6 @@ rsync -avzR --delete \
       "${E2TH_ROOT_DIR}"/./common/POD_Track.hpp \
       "${E2TH_ROOT_DIR}"/./common/POD_PreFoundLambda.hpp \
       "${E2TH_ROOT_DIR}"/./common/POD_McParticle.hpp \
-      "${E2TH_ROOT_DIR}"/./common/POD_InjectedSexa.hpp \
       "${E2TH_ROOT_DIR}"/./common/POD_Event.hpp \
       "${E2TH_ROOT_DIR}"/./common/Math.hpp \
       "${E2TH_ROOT_DIR}"/./common/Framework_TeeTree.hpp \

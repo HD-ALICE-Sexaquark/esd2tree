@@ -1,4 +1,4 @@
-# esd2tree_hdib
+# esd2tree
 
 **AliPhysics** analysis task `AliTaskEsd2Tree`, converts `AliESDs.root` files into derived trees.
 
@@ -32,6 +32,15 @@ For real data: valid `AliESDs.root` files.
 
 For monte-carlo: `AliESDs.root` + `Kinematics.root` + `galice.root` files.
 
+Supported productions, as `RunTask.C`'s `ProductionName` (any other name stops it):
+- real data: `LHC15o`, `LHC18q`, `LHC18r`
+- general-purpose MC: `LHC20e3a`, `LHC20e3b`, `LHC20j6a`, `LHC20j6b`
+- antisexaquark MC: `LHC23l1ab4`, with `InputPath` ending in `/signal` or `/embedded`
+- h-dibaryon MC: `LHC26h2`, with `InputPath` ending in `/signal` or `/embedded`
+
+The antisexaquark real-data trees were produced by tag `rd-sexa-2026.10.12` (commit `f1ba831`), and are not produced
+again: `POD::Event`, `POD::Track`, the track selection and the event selection stay as they were there.
+
 ## Output
 
 A file named `AnalysisResults.root`, containing:
@@ -39,10 +48,13 @@ A file named `AnalysisResults.root`, containing:
 - `TList` "QA". Notable histograms:
    - `TH1D` Centrality
    - `TH1D` CentralityINT7
-   - `TH1D` Tracks_Bookkeeping (empty; booked only because downstream T2DS requires it)
+   - `TH1D` Tracks_Bookkeeping (empty when tracks aren't processed; booked anyway because downstream T2DS requires it)
    - `TH1D` PreFoundLambdas_Bookkeeping
-- `TTree` "Events" (all branches of `common/Schema_Events.hpp` except `InjectedSexa`; `Track` and, in MC, `Track_McEntry`
-  are always empty). Where each row is a distinct selected event, which contains vectors of:
+- `TTree` "Events" (all branches of `common/Schema_Events.hpp`). Where each row is a distinct selected event, which
+  contains vectors of:
    - `POD::Event` (as defined in `common/POD_Event.hpp`)
-   - `POD::Track` (as defined in `common/POD_Track.hpp`), always empty
+   - `POD::Track` (as defined in `common/POD_Track.hpp`), filled only for general-purpose and antisexaquark MC, empty
+     otherwise
    - `POD::PreFoundLambda` (as defined in `common/POD_PreFoundLambda.hpp`)
+   - in MC: `POD::MC::Event`, `POD::McParticle` (as defined in `common/POD_McParticle.hpp`), and the indices of each
+     track's and each pre-found (anti)lambda daughter's `McParticle`

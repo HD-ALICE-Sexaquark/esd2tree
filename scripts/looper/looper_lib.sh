@@ -311,7 +311,6 @@ stage_analysis_files() {
                 common/POD_Track.hpp \
                 common/POD_PreFoundLambda.hpp \
                 common/POD_McParticle.hpp \
-                common/POD_InjectedSexa.hpp \
                 common/POD_Event.hpp \
                 common/Math.hpp \
                 common/Framework_TeeTree.hpp \

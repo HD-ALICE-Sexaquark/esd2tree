@@ -51,7 +51,6 @@ cp "${E2T_ROOT_DIR}/common/Schema_Events.hpp" .
 cp "${E2T_ROOT_DIR}/common/POD_Track.hpp" .
 cp "${E2T_ROOT_DIR}/common/POD_PreFoundLambda.hpp" .
 cp "${E2T_ROOT_DIR}/common/POD_McParticle.hpp" .
-cp "${E2T_ROOT_DIR}/common/POD_InjectedSexa.hpp" .
 cp "${E2T_ROOT_DIR}/common/POD_Event.hpp" .
 cp "${E2T_ROOT_DIR}/common/Math.hpp" .
 cp "${E2T_ROOT_DIR}/common/Framework_TeeTree.hpp" .
