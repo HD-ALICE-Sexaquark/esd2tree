@@ -1,10 +1,11 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/sanitizer.sh`
-# ========================================
+# `esd2tree/scripts/looper/sanitizer.sh`
+# ======================================
 # Single-pass script that syncs jobs' states in GRID with jobs' state in DB.
 # It will give another chance to the stale RESUBMITTED or GIVEN_UP jobs,
 # by setting them to SUBMITTED(n_retries=0) all over again.
+# And to the DL_FAILED downloads, by setting them to DONE, for `downloader.sh`.
 #
 # Ideal usage: (requires .env)
 # `./sanitizer.sh mc`
@@ -16,7 +17,7 @@ shopt -s nullglob
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_XXX_HOME_DIR
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY GRID_ABORQUEZ_HOME_DIR
 
 # command-line argument
 if [[ $# -ne 1 || ( $1 != "mc" && $1 != "rd" ) ]]; then
@@ -40,6 +41,13 @@ db_ensure_exists "${db_file}"
 cd "${LOOPER_USER_DIR}"
 
 # === main === #
+
+# queue the failed downloads again
+n_dl_failed=$(db_count_where "${db_file}" "state='DL_FAILED'")
+if [[ ${n_dl_failed} -gt 0 ]]; then
+    db_update_where "${db_file}" "state='DONE'" "state='DL_FAILED'"
+    log_msg "${script_name}" "sanitizer" "updated ${n_dl_failed} DL_FAILED subjobs to DONE in DB"
+fi
 
 # query unique masterjob_ids that contain SUBMITTED or RESUBMITTED subjobs
 mapfile -t active_masterjobs < <(db_exec "${db_file}" -noheader -list \

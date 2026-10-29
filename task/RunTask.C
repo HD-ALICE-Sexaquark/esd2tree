@@ -56,8 +56,9 @@ void RunTask(const char *Mode,            // "local", "grid"
     }
     bool IsEmbeddedMC = (IsSexaMC || IsHdibMC) && Variant == "embedded";
 
-    // tracks feed the antisexaquark search: on for its MC and the gen. purp. MC; off for real data, whose antisexaquark trees are frozen
-    // (E2T `f1ba831`), and for hdib MC
+    // IMPORTANT: time-dependent choice
+    // - on for sexa MC and GP MC
+    // - off for hdib MC and RD, because sexa RD is already frozen (E2T `f1ba831`)
     bool ProcessTracks = IsMC && !IsHdibMC;
 
     int SplitMaxNFiles = 60;        // default for data
@@ -211,8 +212,7 @@ void RunTask(const char *Mode,            // "local", "grid"
 
     gInterpreter->LoadMacro("AliTaskEsd2Tree.cxx++g");
 
-    TString TaskEsd2Tree_Options =
-        Form("(%i, %i, %i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC, (int)IsEmbeddedMC, (int)ProcessTracks);
+    TString TaskEsd2Tree_Options = Form("(%i, %i, %i, %i, %i)", (int)IsMC, (int)IsSexaMC, (int)IsHdibMC, (int)IsEmbeddedMC, (int)ProcessTracks);
     AliTaskEsd2Tree *TaskEsd2Tree = reinterpret_cast<AliTaskEsd2Tree *>(  //
         gInterpreter->ExecuteMacro("AddTaskEsd2Tree.C" + TaskEsd2Tree_Options));
     if (TaskEsd2Tree == nullptr) return;

@@ -14,17 +14,27 @@ The ALICE offline framework: AliRoot + AliPhysics. Specifically,
 
 ## Environment
 
-For basic local usage:
+It runs only at the PI server, deployed there by `scripts/deploy.sh`: the dedicated MC through its Slurm farm
+(`scripts/farm-pi/`), the real data and the general-purpose MC on the Grid (`scripts/looper/`). Steps in
+`docs/E2T_REPRO.md`.
+
+For basic usage:
 - All env. variables that come with `alienv enter AliRoot/latest,AliPhysics/latest`
 - `ALICE_DATA` : (Reference: https://alisw.github.io/git-advanced/#how-to-use-large-data-files-for-analysis)
+- `E2T_ROOT_DIR` : main repository dir
 
-To use the bash scripts: `LOCAL_SIMS_DIR`, `LOCAL_DATA_DIR`, `E2T_ROOT_DIR`, `E2T_SCRIPTS_DIR`, `E2T_TASK_DIR`,
-`E2T_OUTPUT_DIR`, `E2T_SLURM_DIR`.
+Optional, with their defaults:
+- `E2T_OUTPUT_DIR` : `${E2T_ROOT_DIR}/output`, output of `scripts/farm-pi/` and `scripts/looper/`
+- `E2T_SLURM_DIR` : `${E2T_ROOT_DIR}/slurm`, logs of `scripts/farm-pi/`
 
-To deploy to the PI server with `scripts/deploy.sh`: `E2TH_ROOT_DIR`, `PI_USER_AND_HOST`, `E2TH_AT_PI_PATH`.
+To deploy to the PI server with `scripts/deploy.sh` (from the laptop): `PI_USER_AND_HOST`, `E2T_AT_PI_PATH`.
 
-In addition, to use `scripts/looper/` and submit jobs to the Grid: `LOOPER_DIR`, `JALIEN_TOKEN_CERT`,
-`JALIEN_TOKEN_KEY`, `GRID_XXX_HOME_DIR`.
+To fetch the dedicated MC from GSI with `scripts/farm-pi/fetch_sims.sh`, and run on it with
+`scripts/farm-pi/slurm_wrapper.sh`: `LOCAL_SIMS_DIR`, `GSI_USER_AND_HOST`, `FSSR_AT_GSI_PATH` (as in `~/simulations`;
+optional: `FSSR_OUTPUT_AT_GSI_PATH`, default `${FSSR_AT_GSI_PATH}/output`).
+
+To submit jobs to the Grid with `scripts/looper/` (or `scripts/exec.sh`), and to use `scripts/generate_xml.sh`:
+`LOOPER_DIR`, `JALIEN_TOKEN_CERT`, `JALIEN_TOKEN_KEY`, `GRID_ABORQUEZ_HOME_DIR` (the Grid home dir that holds `xml/`).
 
 ## Input
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# `esd2vector/scripts/generate_xml.sh` -- generate xml files containing collection of raw input files
+# `esd2tree/scripts/generate_xml.sh` -- generate xml files containing collection of raw input files
 
 set -euo pipefail
 

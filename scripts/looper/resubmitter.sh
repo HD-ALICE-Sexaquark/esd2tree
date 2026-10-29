@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/resubmitter.sh`
-# ==========================================
+# `esd2tree/scripts/looper/resubmitter.sh`
+# ========================================
 # Iterative script that monitors tracked jobs:
 # - DONE jobs are marked as such.
 # - Jobs in ERROR are resubmitted, up to `max_submit_retries` times, then given up on.
@@ -17,11 +17,11 @@ shopt -s nullglob
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_XXX_HOME_DIR
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY GRID_ABORQUEZ_HOME_DIR
 
 # command-line argument
 if [[ $# -ne 1 || ( $1 != "mc" && $1 != "rd" ) ]]; then
-    echo "usage: ./resubmitter.sh <mc|rd> <file>"
+    echo "usage: ./resubmitter.sh <mc|rd>"
     exit 1
 fi
 data_kind=$1

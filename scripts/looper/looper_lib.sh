@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/looper_lib.sh`
-# =========================================
+# `esd2tree/scripts/looper/looper_lib.sh`
+# =======================================
 # Shared functions for the grid looper pipeline (`submitter.sh`, `downloader.sh`, `cleaner.sh`).
 # Source this file; do not execute directly.
 # The pipeline state lives in a sqlite3 db file, one row per subjob.
@@ -95,7 +95,7 @@ db_ensure_exists() {
         CREATE TABLE IF NOT EXISTS grid_jobs (
             subjob_id      INTEGER PRIMARY KEY,
             run_number     INTEGER NOT NULL,
-            tag            TEXT NOT NULL DEFAULT '',   -- for mc: sim_set e.g. 'A1.8'; for rd: xml chunk e.g. '2'
+            tag            TEXT NOT NULL DEFAULT '',   -- for mc: production e.g. 'LHC20e3a'; for rd: xml chunk e.g. '2'
             masterjob_id   INTEGER NOT NULL,
             remote_dir     TEXT NOT NULL,
             local_file     TEXT NOT NULL,
@@ -175,6 +175,7 @@ db_get_unique_prop_where() {
 # === quota checks === #
 
 # hardcoded settings
+# NOTE: the mc ones come from the retired LHC23l1a3/b3; re-tune them after the first masterjob of general-purpose MC
 avg_rd_subjob_size_kb=512000 # average AnalysisResults.root size per subjob
 avg_mc_subjob_size_kb=384000
 avg_rd_subjobs_per_masterjob=150
@@ -267,7 +268,7 @@ check_fquota() {
 
 # usage: resolve_production_path <mc|rd> <run_number>
 # Echoes the grid production path, or nothing if the run number is not in any known list.
-# For MC, it doesn't include the simulation sets, aka, the reaction+mass pair.
+# For MC, it doesn't include the suffix of the general-purpose productions, "a" (minimum bias) or "b" (0-10%).
 resolve_production_path() {
     local data_kind=$1
     local run_number=$2
@@ -275,19 +276,19 @@ resolve_production_path() {
     local production_path=""
     if grep -qsw "${run_number}" "${lists_dir}"/LHC15o_pass2_rn*.txt; then
         if [[ ${data_kind} == "mc" ]]; then
-            production_path="/alice/sim/2023/LHC23l1b3";
+            production_path="/alice/sim/2020/LHC20j6";
         else
             production_path="/alice/data/2015/LHC15o";
         fi
     elif grep -qsw "${run_number}" "${lists_dir}"/LHC18q_pass3_rn*.txt; then
         if [[ ${data_kind} == "mc" ]]; then
-            production_path="/alice/sim/2023/LHC23l1a3";
+            production_path="/alice/sim/2020/LHC20e3";
         else
             production_path="/alice/data/2018/LHC18q";
         fi
     elif grep -qsw "${run_number}" "${lists_dir}"/LHC18r_pass3_rn*.txt; then
         if [[ ${data_kind} == "mc" ]]; then
-            production_path="/alice/sim/2023/LHC23l1a3";
+            production_path="/alice/sim/2020/LHC20e3";
         else
             production_path="/alice/data/2018/LHC18r";
         fi

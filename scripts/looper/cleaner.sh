@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/cleaner.sh`
-# ======================================
+# `esd2tree/scripts/looper/cleaner.sh`
+# ====================================
 # Phase 4: Delete remote dirs of DOWNLOADED entries.
+#          DL_FAILED ones are kept, for `sanitizer.sh` to queue their download again.
 # Safe to run at any time. The script loops forever.
 #
 # Ideal usage: (requires .env)
@@ -14,7 +15,7 @@ set -euo pipefail
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY
 
 # command-line argument
 if [[ $# -ne 1 || ( $1 != "mc" && $1 != "rd" ) ]]; then echo "usage: ./cleaner.sh <mc|rd>"; exit 1; fi
@@ -36,9 +37,10 @@ db_ensure_exists "${db_file}"
 
 while true; do
 
-    # query subjobs that are DOWNLOADED or DL_FAILED
-    log_msg "${script_name}" "query" "checking for DOWNLOADED or DL_FAILED subjobs"
-    mapfile -t downloaded_subjobs < <(db_get_prop_where "${db_file}" "subjob_id" "state IN ('DOWNLOADED','DL_FAILED')")
+    # query subjobs that are DOWNLOADED
+    # NOTE: not DL_FAILED, whose remote output is the only copy
+    log_msg "${script_name}" "query" "checking for DOWNLOADED subjobs"
+    mapfile -t downloaded_subjobs < <(db_get_prop_where "${db_file}" "subjob_id" "state='DOWNLOADED'")
     n_jobs_finished=${#downloaded_subjobs[@]}
     if [[ ${n_jobs_finished} -eq 0 ]]; then
         log_msg "${script_name}" "query" "nothing to clean, polling back in ${poll_interval} seconds"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/submitter.sh`
-# ========================================
+# `esd2tree/scripts/looper/submitter.sh`
+# ======================================
 # Single-pass script that submits GRID jobs for every run number (or job tag) in an input text file,
 # and adds them to the DB.
 
@@ -11,13 +11,15 @@ shopt -s nullglob
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE GRID_XXX_HOME_DIR
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY GRID_ABORQUEZ_HOME_DIR
+export E2T_OUTPUT_DIR=${E2T_OUTPUT_DIR:-${E2T_ROOT_DIR}/output}
 
 # command-line argument
 if [[ $# -ne 2 || ( $1 != "mc" && $1 != "rd" ) || ! -f $2 ]]; then
     echo "usage: ./submitter.sh <mc|rd> <file>"
     echo "       where the plain text <file> is filled in each line with:"
-    echo "       - for mc: either <run number> or <sim set>_<run number>"
+    echo "       - for mc: either <run number> (both its general-purpose productions, \"a\" and \"b\")"
+    echo "                 or <production>_<run number>, e.g. LHC20e3a_296690"
     echo "       - for rd: either <run number> or <run number>_<xml chunk>"
     echo "       it's important that the two formats don't mix within a same file,"
     echo "       the reading mode is detected upon reading the first line"
@@ -32,9 +34,8 @@ looper_require_env GRID_USERNAME LOOPER_USER_DIR LOOPER_LOGS_DIR GRID_HOME_DIR
 
 # hardcoded params
 script_name=$(basename "$0" .sh)
-# -- mc related
-mc_signal_channels=("A" "D" "H")
-mc_sexaquark_masses=("1.73" "1.8" "1.87" "1.94" "2.01")
+# -- mc related: suffixes of the general-purpose productions, "a" (minimum bias) and "b" (0-10%)
+mc_gp_suffixes=("a" "b")
 
 # db state file
 db_file="${LOOPER_DIR}/${GRID_USERNAME}_${data_kind}.db"
@@ -157,13 +158,14 @@ fi
 while IFS= read -r line_from_rn_list; do
 
     # determine run number (needed here before setting production number)
+    mc_production_name=""
     if [[ ${read_tags_instead_of_rn} -eq 0 ]]; then
         # <run number> was written
         run_number=${line_from_rn_list}
     else
         if [[ ${data_kind} == "mc" ]]; then
-            # <sim set>_<run number> was written
-            sim_set=${line_from_rn_list%_*}
+            # <production>_<run number> was written
+            mc_production_name=${line_from_rn_list%_*}
             run_number=${line_from_rn_list#*_}
         else
             # <run number>_<xml chunk> was written
@@ -178,40 +180,34 @@ while IFS= read -r line_from_rn_list; do
         log_msg "${script_name}" "${run_number}" "fatal :: could not resolve production"
         exit 1
     fi
-    production_name=$(basename "${production_path}") # e.g. LHC23l1a3, LHC18q
-    small_prod_name=${production_name#LHC}           # remove 'LHC', e.g. 23l1a3, 18q
+    production_name=$(basename "${production_path}") # e.g. LHC20e3, LHC18q
+    small_prod_name=${production_name#LHC}           # remove 'LHC', e.g. 20e3, 18q
     log_msg "${script_name}" "${run_number}" "production path: ${production_path} (small: ${small_prod_name})"
 
     if [[ ${data_kind} == "mc" ]]; then
-        if [[ ${read_tags_instead_of_rn} -eq 0 ]]; then
-            for signal_channel in "${mc_signal_channels[@]}"; do
-                for sexaquark_mass in "${mc_sexaquark_masses[@]}"; do
-                    sim_set="${signal_channel}${sexaquark_mass}"
-                    # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
-                    #                  <tag> <grid_working_dir> <local_xml> <local_dir>
-                    submit_masterjob "mc" \
-                                    "${production_path}/${sim_set}" \
-                                    "${production_name}" \
-                                    "${run_number}" \
-                                    "${sim_set}" \
-                                    "work/Esd2Vector/mc_${small_prod_name}" \
-                                    "" \
-                                    "${E2T_ROOT_DIR}/output/grid_mc_${small_prod_name}/${sim_set}/${run_number}"
-                done # end of masses loop
-            done # end of channels loop
-        else
-            # read_tags_instead_of_rn == 1
+        # general-purpose productions to submit: both, or the one that was written
+        mc_production_names=()
+        for suffix in "${mc_gp_suffixes[@]}"; do
+            if [[ ${read_tags_instead_of_rn} -eq 0 || ${mc_production_name} == "${production_name}${suffix}" ]]; then
+                mc_production_names+=("${production_name}${suffix}")
+            fi
+        done
+        if [[ ${#mc_production_names[@]} -eq 0 ]]; then
+            log_msg "${script_name}" "${run_number}" "fatal :: ${mc_production_name} is not a general-purpose production of this run"
+            exit 1
+        fi
+        for mc_production_name in "${mc_production_names[@]}"; do
             # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
             #                  <tag> <grid_working_dir> <local_xml> <local_dir>
             submit_masterjob "mc" \
-                             "${production_path}/${sim_set}" \
-                             "${production_name}" \
+                             "$(dirname "${production_path}")/${mc_production_name}" \
+                             "${mc_production_name}" \
                              "${run_number}" \
-                             "${sim_set}" \
-                             "work/Esd2Vector/mc_${small_prod_name}" \
+                             "${mc_production_name}" \
+                             "work/Esd2Tree/mc_${mc_production_name#LHC}" \
                              "" \
-                             "${E2T_ROOT_DIR}/output/grid_mc_${small_prod_name}/${sim_set}/${run_number}"
-        fi
+                             "${E2T_OUTPUT_DIR}/grid_mc_${mc_production_name#LHC}/${run_number}"
+        done # end of productions loop
     else
         # data kind == "rd"
         if [[ ${read_tags_instead_of_rn} -eq 0 ]]; then
@@ -229,7 +225,7 @@ while IFS= read -r line_from_rn_list; do
                 xml_chunk=$(( index + 1 ))
                 local_xml_file="${xml_files_arr[${index}]}"
                 remote_xml_file="${local_xml_file#*/xml/}" # remove everything behind and including '/xml/'
-                remote_xml_file="${GRID_XXX_HOME_DIR}/xml/${production_name}/${run_number}/$(basename "${local_xml_file}")"
+                remote_xml_file="${GRID_ABORQUEZ_HOME_DIR}/xml/${production_name}/${run_number}/$(basename "${local_xml_file}")"
                 # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
                 #                  <tag> <grid_working_dir> <local_xml> <local_dir>
                 submit_masterjob "rd" \
@@ -237,13 +233,13 @@ while IFS= read -r line_from_rn_list; do
                                  "${production_name}" \
                                  "${run_number}" \
                                  "${xml_chunk}" \
-                                 "work/Esd2Vector/rd_${small_prod_name}" \
+                                 "work/Esd2Tree/rd_${small_prod_name}" \
                                  "${remote_xml_file}" \
-                                 "${E2T_ROOT_DIR}/output/grid_rd_${small_prod_name}/${run_number}"
+                                 "${E2T_OUTPUT_DIR}/grid_rd_${small_prod_name}/${run_number}"
             done # end of loop over xml files
         else
             # read_tags_instead_of_rn == 1
-            remote_xml_file="${GRID_XXX_HOME_DIR}/xml/${production_name}/${run_number}/${line_from_rn_list}.xml"
+            remote_xml_file="${GRID_ABORQUEZ_HOME_DIR}/xml/${production_name}/${run_number}/${line_from_rn_list}.xml"
             # submit_masterjob <data_kind> <grid_input_dir> <production_name> <run_number> \
             #                  <tag> <grid_working_dir> <local_xml> <local_dir>
             submit_masterjob "rd" \
@@ -251,9 +247,9 @@ while IFS= read -r line_from_rn_list; do
                              "${production_name}" \
                              "${run_number}" \
                              "${xml_chunk}" \
-                             "work/Esd2Vector/rd_${small_prod_name}" \
+                             "work/Esd2Tree/rd_${small_prod_name}" \
                              "${remote_xml_file}" \
-                             "${E2T_ROOT_DIR}/output/grid_rd_${small_prod_name}/${run_number}"
+                             "${E2T_OUTPUT_DIR}/grid_rd_${small_prod_name}/${run_number}"
         fi
     fi
 done < "${run_numbers_list}" # end of loop over run numbers

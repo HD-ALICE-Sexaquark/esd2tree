@@ -8,7 +8,6 @@
 *.log
 *.pcm
 .vscode/
-/config/
 /doc/**_TEST.txt
 /doc/dir_numbers/
 /looper/

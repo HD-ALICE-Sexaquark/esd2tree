@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# `esd2vector/scripts/looper/downloader.sh`
-# =========================================
+# `esd2tree/scripts/looper/downloader.sh`
+# =======================================
 # Phase 3: Download the output of DONE subjobs and verify the transfers (size + md5).
 #          If succesful, mark them as DOWNLOADED.
-#          Failed downloads are retried in-call.
+#          Failed downloads are retried in-call, then marked as DL_FAILED (`sanitizer.sh` queues them again).
 #
 # Ideal usage: (requires .env)
 # `./downloader.sh mc`
@@ -15,7 +15,7 @@ set -euo pipefail
 # environment
 if [[ -z ${E2T_ROOT_DIR:-} ]]; then echo "error: missing env. var. E2T_ROOT_DIR"; exit 1; fi
 source "${E2T_ROOT_DIR}/scripts/looper/looper_lib.sh"
-looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY ALIROOT_RELEASE ALIPHYSICS_RELEASE
+looper_require_env LOOPER_DIR JALIEN_TOKEN_CERT JALIEN_TOKEN_KEY
 
 # command-line argument
 if [[ $# -ne 1 || ( $1 != "mc" && $1 != "rd" ) ]]; then echo "usage: ./downloader.sh <mc|rd>"; exit 1; fi
